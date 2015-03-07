@@ -8,7 +8,7 @@ local Settings = {}
 
 Settings.development = {
     code_cache = false,
-    port = 7200,
+    port = 7202,
     expose_api_console = true
 }
 
@@ -20,7 +20,7 @@ Settings.test = {
 
 Settings.production = {
     code_cache = true,
-    port = 80,
+    port = 7200,
     expose_api_console = false
 }
 
