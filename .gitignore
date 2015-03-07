@@ -22,3 +22,6 @@ tmtags
 .Spotlight-V100
 .Trashes
 *.swp
+
+# Redis
+*.rdb
