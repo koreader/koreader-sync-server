@@ -1,0 +1,1 @@
+require 'gin.spec.runner'
