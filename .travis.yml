@@ -1,0 +1,17 @@
+# Travis-CI for koreader-sync-server
+# see travis-ci.org for details
+
+before_install:
+    - sudo apt-get update
+
+install:
+    - sudo apt-get install luarocks redis-server nginx openssl
+    - sudo luarocks install gin
+    - sudo luarocks install busted
+    - sudo openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout /etc/nginx/ssl/nginx.key -out /etc/nginx/ssl/nginx.crt -subj "/"
+
+script:
+    - redis-server &
+    - sleep 3
+    - busted
+
