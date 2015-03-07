@@ -1,0 +1,62 @@
+diff --git a/gin-0.1.4-1.rockspec b/gin-0.1.4-1.rockspec
+index 9c014ce..d5ad04f 100644
+--- a/gin-0.1.4-1.rockspec
++++ b/gin-0.1.4-1.rockspec
+@@ -13,15 +13,16 @@ description = {
+ }
+ 
+ dependencies = {
+-    "lua = 5.2",
+-    "ansicolors = 1.0.2-3",
+-    "busted = 1.11.1",
+-    "lua-cjson = 2.1.0-1",
+-    "luasocket = 3.0rc1-1",
+-    "luafilesystem = 1.6.2-2",
+-    "luaposix = 32-1",
+-    "penlight = 1.3.1-1",
+-    "luadbi = 0.5-1"
++    "lua >= 5.1",
++    "ansicolors >= 1.0.2-3",
++    "busted >= 1.10.0",
++    "lua-cjson >= 2.1.0-1",
++    "luasocket >= 3.0rc1-1",
++    "luasec >= 0.5-2",
++    "luafilesystem >= 1.6.2-2",
++    "luaposix >= 32-1",
++    "penlight >= 1.3.1-1",
++    "luadbi >= 0.5-1"
+ }
+ 
+ build = {
+diff --git a/gin/spec/runners/integration.lua b/gin/spec/runners/integration.lua
+index e40fa80..240fce0 100644
+--- a/gin/spec/runners/integration.lua
++++ b/gin/spec/runners/integration.lua
+@@ -1,5 +1,6 @@
+ -- dep
+ local http = require 'socket.http'
++local https = require 'ssl.https'
+ local url = require 'socket.url'
+ local json = require 'cjson'
+ 
+@@ -81,8 +82,9 @@ local function set_accept_header(request, api_version)
+ end
+ 
+ local function hit_server(request)
++    local scheme = request.scheme or 'http'
+     local full_url = url.build({
+-        scheme = 'http',
++        scheme = scheme,
+         host = '127.0.0.1',
+         port = Gin.settings.port,
+         path = request.path,
+@@ -90,7 +92,8 @@ local function hit_server(request)
+     })
+ 
+     local response_body = {}
+-    local ok, response_status, response_headers = http.request({
++    local http_request = (scheme == 'https') and https.request or http.request
++    local ok, response_status, response_headers = http_request({
+         method = request.method,
+         url = full_url,
+         source = ltn12.source.string(request.body),

@@ -5,19 +5,26 @@ before_install:
     - sudo apt-get update
 
 install:
-    - sudo apt-get install redis-server openssl perl
-    - sudo mkdir -p /etc/nginx/ssl
-    - sudo openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout /etc/nginx/ssl/nginx.key -out /etc/nginx/ssl/nginx.crt -subj "/"
-
+    # install openresty
     - sudo apt-get install libreadline-dev libncurses5-dev libpcre3-dev libssl-dev
     - wget http://openresty.org/download/ngx_openresty-1.7.10.1.tar.gz
     - tar zxvf ngx_openresty-1.7.10.1.tar.gz
     - cd ngx_openresty-1.7.10.1/
-    - ./configure && make && sudo make install && cd ..
+    - ./configure --prefix=/opt/openresty && make && sudo make install && cd ..
+    - export PATH=/opt/openresty/nginx/sbin:$PATH
+    - sudo apt-get install openssl
+    - sudo mkdir -p /etc/nginx/ssl
+    - sudo openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout /etc/nginx/ssl/nginx.key -out /etc/nginx/ssl/nginx.crt -subj "/"
 
-    - sudo apt-get install luarocks
-    - sudo luarocks install luasec
-    - sudo luarocks install --server=http://gin.io/repo gin
+
+    - sudo apt-get install luarocks redis-server
+    # libssl.* are in /usr/lib/x86_64-linux-gnu on Travis Ubuntu precise
+    - sudo luarocks install luasec OPENSSL_LIBDIR=/usr/lib/x86_64-linux-gnu
+    - git clone https://github.com/ostinelli/gin
+    # patch gin for https support
+    - cd gin && patch -N -p1 < ../gin.patch
+    - sudo luarocks make && cd ..
+    - sudo luarocks install redis-lua
     - sudo luarocks install busted
 
 script:
