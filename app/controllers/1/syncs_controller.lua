@@ -32,7 +32,7 @@ end
 
 function SyncsController:auth_user()
     if self:authorize() then
-        return 200, "OK"
+        return 200, { authorized = "OK" }
     else
         self:raise_error(2001)
     end

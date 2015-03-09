@@ -107,7 +107,7 @@ describe("SyncsController", function()
             assert.are.same({code = 2001, message = "Unauthorized"}, response.body)
             response = authorize(username, userkey)
             assert.are.same(200, response.status)
-            assert.are.same("OK", response.body)
+            assert.are.same("OK", response.body.authorized)
         end)
     end)
 
