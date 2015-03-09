@@ -68,7 +68,7 @@ function SyncsController:get_progress()
             local res = {}
             local percentage, err = redis:get(percent_key)
             if percentage and percentage ~= null then
-                res.percentage = percentage
+                res.percentage = tonumber(percentage)
             end
             local progress, err = redis:get(progress_key)
             if progress and progress ~= null then
@@ -101,7 +101,7 @@ function SyncsController:update_progress()
                 local progress_key = string.format(self.progress_key, username, doc)
                 local device_key = string.format(self.device_key, username, doc)
                 local old_percent, err = redis:get(percent_key)
-                if old_percent == null or old_percent < percentage then
+                if old_percent == null or tonumber(old_percent) <= tonumber(percentage) then
                     local ok, err = redis:set(percent_key, percentage)
                     if not ok then self:raise_error(2000) end
                     local ok, err = redis:set(progress_key, progress)

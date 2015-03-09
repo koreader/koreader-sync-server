@@ -147,7 +147,7 @@ describe("SyncsController", function()
             local response = get(username, userkey, doc)
             assert.are.same(200, response.status)
             assert.are.same({
-                percentage = "0.32",
+                percentage = 0.32,
                 progress = "56",
                 device = "my kpw"
             }, response.body)
@@ -158,7 +158,7 @@ describe("SyncsController", function()
             local response = get(username, userkey, doc)
             assert.are.same(200, response.status)
             assert.are.same({
-                percentage = "0.32",
+                percentage = 0.32,
                 progress = "56",
                 device = "my kpw"
             }, response.body)
