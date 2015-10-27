@@ -22,7 +22,8 @@ RUN luarocks install luasec OPENSSL_LIBDIR=/usr/lib/x86_64-linux-gnu
 RUN git clone https://github.com/ostinelli/gin
 # patch gin for https support
 ADD gin.patch /app/gin.patch
-RUN cd gin && patch -N -p1 < ../gin.patch
+# patch and ignore error
+RUN cd gin && patch -N -p1 < ../gin.patch; if [ $? -eq 1 ]; then exit 0; fi
 RUN cd gin && luarocks make
 RUN luarocks install redis-lua
 RUN luarocks install busted
