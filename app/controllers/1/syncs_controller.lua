@@ -100,22 +100,17 @@ function SyncsController:update_progress()
                 local percent_key = string.format(self.percentage_key, username, doc)
                 local progress_key = string.format(self.progress_key, username, doc)
                 local device_key = string.format(self.device_key, username, doc)
-                local old_percent, err = redis:get(percent_key)
-                if old_percent == null or tonumber(old_percent) <= tonumber(percentage) then
-                    local ok, err = redis:set(percent_key, percentage)
-                    if not ok then self:raise_error(2000) end
-                    local ok, err = redis:set(progress_key, progress)
-                    if not ok then self:raise_error(2000) end
-                    local ok, err = redis:set(device_key, device)
-                    if not ok then self:raise_error(2000) end
-                    return 200, {
-                        percentage = percentage,
-                        progress = progress,
-                        device = device,
-                    }
-                else
-                    return 202, { message = "Not the furthest progress." }
-                end
+                local ok, err = redis:set(percent_key, percentage)
+                if not ok then self:raise_error(2000) end
+                local ok, err = redis:set(progress_key, progress)
+                if not ok then self:raise_error(2000) end
+                local ok, err = redis:set(device_key, device)
+                if not ok then self:raise_error(2000) end
+                return 200, {
+                    percentage = percentage,
+                    progress = progress,
+                    device = device,
+                }
             else
                 self:raise_error(2003)
             end
