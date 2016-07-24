@@ -115,7 +115,7 @@ function SyncsController:update_progress()
                 self:raise_error(2003)
             end
         else
-            return 502, { message = "Field 'document' not provided."}
+            return 502, { message = "Field 'document' not provided." }
         end
     end
 end
