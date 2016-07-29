@@ -5,6 +5,8 @@ local SyncsController = {
     progress_key = "user:%s:document:%s:progress",
     percentage_key = "user:%s:document:%s:percentage",
     device_key = "user:%s:document:%s:device",
+    device_id_key = "user:%s:document:%s:device_id",
+    timestamp_key = "user:%s:document:%s:timestamp",
 }
 
 local null = ngx.null
@@ -65,7 +67,11 @@ function SyncsController:get_progress()
             local percent_key = string.format(self.percentage_key, username, doc)
             local progress_key = string.format(self.progress_key, username, doc)
             local device_key = string.format(self.device_key, username, doc)
-            local res = {}
+            local device_id_key = string.format(self.device_id_key, username, doc)
+            local timestamp_key = string.format(self.timestamp_key, username, doc)
+            local res = {
+              document = doc,
+            }
             local percentage, err = redis:get(percent_key)
             if percentage and percentage ~= null then
                 res.percentage = tonumber(percentage)
@@ -77,6 +83,14 @@ function SyncsController:get_progress()
             local device, err = redis:get(device_key)
             if device and device ~= null then
                 res.device = device
+            end
+            local device_id, err = redis:get(device_id_key)
+            if device_id and device_id ~= null then
+                res.device_id = device_id
+            end
+            local timestamp, err = redis:get(timestamp_key)
+            if timestamp and timpstamp ~= null then
+                res.timpstamp = timestamp
             end
             return 200, res
         else
@@ -93,23 +107,30 @@ function SyncsController:update_progress()
     else
         local doc = self.request.body.document
         if doc then
-            local percentage = self.request.body.percentage
+            local percentage = tonumber(self.request.body.percentage)
             local progress = self.request.body.progress
             local device = self.request.body.device
+            local device_id = self.request.body.device_id
+            local timestamp = os.time()
             if percentage and progress and device then
                 local percent_key = string.format(self.percentage_key, username, doc)
                 local progress_key = string.format(self.progress_key, username, doc)
                 local device_key = string.format(self.device_key, username, doc)
+                local device_id_key = string.format(self.device_id_key, username, doc)
+                local timestamp_key = string.format(self.timestamp_key, username, doc)
                 local ok, err = redis:set(percent_key, percentage)
                 if not ok then self:raise_error(2000) end
                 local ok, err = redis:set(progress_key, progress)
                 if not ok then self:raise_error(2000) end
                 local ok, err = redis:set(device_key, device)
                 if not ok then self:raise_error(2000) end
+                local ok, err = redis:set(device_id_key, device_id)
+                if not ok then self:raise_error(2000) end
+                local ok, err = redis:set(timestamp_key, timestamp)
+                if not ok then self:raise_error(2000) end
                 return 200, {
-                    percentage = percentage,
-                    progress = progress,
-                    device = device,
+                    document = doc,
+                    timestamp = timestamp,
                 }
             else
                 self:raise_error(2003)
