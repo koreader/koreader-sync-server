@@ -116,21 +116,11 @@ function SyncsController:get_progress()
         self:raise_error(self.error_internal)
     end
 
-    if results[1] and results[1] ~= null then
-        res.percentage = tonumber(results[1])
-    end
-    if results[2] and results[2] ~= null then
-        res.progress = results[2]
-    end
-    if results[3] and results[3] ~= null then
-        res.device = results[3]
-    end
-    if results[4] and results[4] ~= null then
-        res.device_id = results[4]
-    end
-    if results[5] and results[5] ~= null then
-        res.timpstamp = tonumber(results[5])
-    end
+    res.percentage = results[1]
+    res.progress = results[2]
+    res.device = results[3]
+    res.device_id = results[4]
+    res.timpstamp = results[5]
     return 200, res
 end
 
