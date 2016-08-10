@@ -2,17 +2,38 @@ local Redis = require "db.redis"
 
 local SyncsController = {
     user_key = "user:%s:key",
-    progress_key = "user:%s:document:%s:progress",
-    percentage_key = "user:%s:document:%s:percentage",
-    device_key = "user:%s:document:%s:device",
+    doc_key = "user:%s:document:%s",
+    progress_field = "progress",
+    percentage_field = "percentage",
+    device_field = "device",
+    device_id_field = "device_id",
+    timestamp_field = "timestamp",
+
+    error_no_redis = 1000,
+    error_internal = 2000,
+    error_unauthorized_user = 2001,
+    error_user_exists = 2002,
+    error_invalid_fields = 2003,
+    -- Do we really need to handle 'document' field specifically?
+    error_document_field_missing = 2004,
 }
 
 local null = ngx.null
 
+-- Whether a field is valid, i.e. not an empty string.
+local function is_valid_field(field)
+    return string.len(field) > 0
+end
+
+-- Whether a field is valid as a redis key, i.e. not an empty string and contains no colon.
+local function is_valid_key_field(field)
+    return is_valid_field(field) and not string.find(field, ":")
+end
+
 function SyncsController:getRedis()
     local redis = Redis:new()
     if not redis then
-        self:raise_error(1000)
+        self:raise_error(self.error_no_redis)
     else
         return redis
     end
@@ -22,7 +43,7 @@ function SyncsController:authorize()
     local redis = self:getRedis()
     local auth_user = self.request.headers['x-auth-user']
     local auth_key = self.request.headers['x-auth-key']
-    if auth_user and auth_key then
+    if is_valid_field(auth_key) and is_valid_key_field(auth_user) then
         local key, err = redis:get(string.format(self.user_key, auth_user))
         if auth_key == key then
             return auth_user
@@ -34,94 +55,114 @@ function SyncsController:auth_user()
     if self:authorize() then
         return 200, { authorized = "OK" }
     else
-        self:raise_error(2001)
+        self:raise_error(self.error_unauthorized_user)
     end
 end
 
 function SyncsController:create_user()
     local redis = self:getRedis()
-    local user_key = string.format(self.user_key, self.request.body.username or "")
+    if not redis then
+        self:raise_error(self.error_no_redis)
+    end
+
+    if not is_valid_key_field(self.request.body.username)
+    or not is_valid_field(self.request.body.password) then
+        self:raise_error(self.error_invalid_fields)
+    end
+
+    local user_key = string.format(self.user_key, self.request.body.username)
     local user, err = redis:get(user_key)
     if user == null then
         ok, err = redis:set(user_key, self.request.body.password)
         if not ok then
-            self:raise_error(2000)
+            self:raise_error(self.error_internal)
         else
             return 201, { username = self.request.body.username }
         end
     elseif user then
-        self:raise_error(2002)
+        self:raise_error(self.error_user_exists)
+    else
+        self:raise_error(self.error_internal)
     end
 end
 
 function SyncsController:get_progress()
     local redis = self:getRedis()
+    if not redis then
+        self:raise_error(self.error_no_redis)
+    end
+
     local username = self:authorize()
     if not username then
-        self:raise_error(2001)
-    else
-        local doc = self.params.document
-        if doc then
-            local percent_key = string.format(self.percentage_key, username, doc)
-            local progress_key = string.format(self.progress_key, username, doc)
-            local device_key = string.format(self.device_key, username, doc)
-            local res = {}
-            local percentage, err = redis:get(percent_key)
-            if percentage and percentage ~= null then
-                res.percentage = tonumber(percentage)
-            end
-            local progress, err = redis:get(progress_key)
-            if progress and progress ~= null then
-                res.progress = progress
-            end
-            local device, err = redis:get(device_key)
-            if device and device ~= null then
-                res.device = device
-            end
-            return 200, res
-        else
-            self:raise_error(2003)
-        end
+        self:raise_error(self.error_unauthorized_user)
     end
+
+    local doc = self.params.document
+    if not is_valid_key_field(doc) then
+        self:raise_error(self.error_document_field_missing)
+    end
+
+    local key = string.format(self.doc_key, username, doc)
+    local res = {
+      document = doc,
+    }
+    local results, err = redis:hmget(key,
+                                     self.percentage_field,
+                                     self.progress_field,
+                                     self.device_field,
+                                     self.device_id_field,
+                                     self.timestamp_field)
+    if err then
+        self:raise_error(self.error_internal)
+    end
+
+    res.percentage = results[1]
+    res.progress = results[2]
+    res.device = results[3]
+    res.device_id = results[4]
+    res.timpstamp = results[5]
+    return 200, res
 end
 
 function SyncsController:update_progress()
     local redis = self:getRedis()
+    if not redis then
+        self:raise_error(self.error_no_redis)
+    end
+
     local username = self:authorize()
     if not username then
-        self:raise_error(2001)
-    else
-        local doc = self.request.body.document
-        if doc then
-            local percentage = self.request.body.percentage
-            local progress = self.request.body.progress
-            local device = self.request.body.device
-            if percentage and progress and device then
-                local percent_key = string.format(self.percentage_key, username, doc)
-                local progress_key = string.format(self.progress_key, username, doc)
-                local device_key = string.format(self.device_key, username, doc)
-                local old_percent, err = redis:get(percent_key)
-                if old_percent == null or tonumber(old_percent) <= tonumber(percentage) then
-                    local ok, err = redis:set(percent_key, percentage)
-                    if not ok then self:raise_error(2000) end
-                    local ok, err = redis:set(progress_key, progress)
-                    if not ok then self:raise_error(2000) end
-                    local ok, err = redis:set(device_key, device)
-                    if not ok then self:raise_error(2000) end
-                    return 200, {
-                        percentage = percentage,
-                        progress = progress,
-                        device = device,
-                    }
-                else
-                    return 202, { message = "Not the furthest progress." }
-                end
-            else
-                self:raise_error(2003)
-            end
-        else
-            return 502, { message = "Field 'document' not provided."}
+        self:raise_error(error_unauthorized_user)
+    end
+
+    local doc = self.request.body.document
+    if not is_valid_key_field(doc) then
+        self:raise_error(error_document_field_missing)
+    end
+
+    local percentage = tonumber(self.request.body.percentage)
+    local progress = self.request.body.progress
+    local device = self.request.body.device
+    local device_id = self.request.body.device_id
+    local timestamp = os.time()
+    if percentage and progress and device then
+        local key = string.format(self.doc_key, username, doc)
+        local ok, err = redis:hmset(key, {
+            [self.percentage_field] = percentage,
+            [self.progress_field] = progress,
+            [self.device_field] = device,
+            [self.device_id_field] = device_id,
+            [self.timestamp_field] = timestamp,
+        })
+        if not ok then
+            self:raise_error(self.error_internal)
         end
+        return 200, {
+            document = doc,
+            timestamp = timestamp,
+        }
+    else
+        self:raise_error(self.error_invalid_fields)
     end
 end
 
