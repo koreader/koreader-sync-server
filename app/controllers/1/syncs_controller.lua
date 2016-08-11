@@ -121,7 +121,7 @@ function SyncsController:get_progress()
         res.device_id = results[4]
     end
     if results[5] and results[5] ~= null then
-        res.timpstamp = tonumber(results[5])
+        res.timestamp = tonumber(results[5])
     end
 
     if next(res) then
