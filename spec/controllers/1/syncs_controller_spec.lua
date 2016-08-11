@@ -143,6 +143,7 @@ describe("SyncsController", function()
             update(username, userkey, doc, 0.32, "56", "my kpw")
             local response = get(username, userkey, doc)
             assert.are.same(200, response.status)
+            assert.truthy(response.body.timestamp)
             -- Clear timestamp, it varies.
             response.body.timestamp = nil
             assert.are.same({
@@ -158,6 +159,7 @@ describe("SyncsController", function()
             update(username, userkey, doc, 0.22, "36", "my pb")
             local response = get(username, userkey, doc)
             assert.are.same(200, response.status)
+            assert.truthy(response.body.timestamp)
             -- Clear timestamp, it varies.
             response.body.timestamp = nil
             assert.are.same({
