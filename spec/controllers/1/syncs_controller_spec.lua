@@ -144,8 +144,9 @@ describe("SyncsController", function()
             local response = get(username, userkey, doc)
             assert.are.same(200, response.status)
             -- Clear timestamp, it varies.
-            response.body["timestamp"] = nil
+            response.body.timestamp = nil
             assert.are.same({
+                document = doc
                 percentage = 0.32,
                 progress = "56",
                 device = "my kpw"
@@ -158,8 +159,9 @@ describe("SyncsController", function()
             local response = get(username, userkey, doc)
             assert.are.same(200, response.status)
             -- Clear timestamp, it varies.
-            response.body["timestamp"] = nil
+            response.body.timestamp = nil
             assert.are.same({
+                document = doc
                 percentage = 0.22,
                 progress = "36",
                 device = "my pb"
