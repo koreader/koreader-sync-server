@@ -13,10 +13,10 @@
 -------------------------------------------------------------------------------------------------------------------
 
 local Errors = {
-    [1000] = { status = 503, message = "Cannot connect to redis server.", },
-    [2000] = { status = 503, message = "Unknown server error.", },
+    [1000] = { status = 502, message = "Cannot connect to redis server.", },
+    [2000] = { status = 502, message = "Unknown server error.", },
     [2001] = { status = 401, message = "Unauthorized", },
-    [2002] = { status = 401, message = "Username is already registered.", },
+    [2002] = { status = 402, message = "Username is already registered.", },
     [2003] = { status = 403, message = "Invalid request", },
     [2004] = { status = 403, message = "Field 'document' not provided.", },
 }

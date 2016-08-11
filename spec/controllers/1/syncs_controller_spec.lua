@@ -130,13 +130,10 @@ describe("SyncsController", function()
         it("should update document progress", function()
             local response = update(username, userkey, doc, 0.32, "56", "my kpw")
             assert.are.same(200, response.status)
-            assert.are.same({
-                percentage = 0.32,
-                progress = "56",
-                device = "my kpw"
-            }, response.body)
+            assert.are.same(doc, response.body.document)
+            assert.truthy(response.body.timestamp)
         end)
-        it("cannot get non-existent document progres", function()
+        it("cannot get progress of non-existent document", function()
             update(username, userkey, doc, 0.32, "56", "my kpw")
             local response = get(username, userkey, doc .. "non_existent")
             assert.are.same(200, response.status)
@@ -147,7 +144,7 @@ describe("SyncsController", function()
             local response = get(username, userkey, doc)
             assert.are.same(200, response.status)
             assert.are.same({
-                percentage = 0.32,
+                percentage = '0.32',
                 progress = "56",
                 device = "my kpw"
             }, response.body)

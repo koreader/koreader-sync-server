@@ -61,9 +61,6 @@ end
 
 function SyncsController:create_user()
     local redis = self:getRedis()
-    if not redis then
-        self:raise_error(self.error_no_redis)
-    end
 
     if not is_valid_key_field(self.request.body.username)
     or not is_valid_field(self.request.body.password) then
@@ -88,9 +85,6 @@ end
 
 function SyncsController:get_progress()
     local redis = self:getRedis()
-    if not redis then
-        self:raise_error(self.error_no_redis)
-    end
 
     local username = self:authorize()
     if not username then
@@ -126,18 +120,15 @@ end
 
 function SyncsController:update_progress()
     local redis = self:getRedis()
-    if not redis then
-        self:raise_error(self.error_no_redis)
-    end
 
     local username = self:authorize()
     if not username then
-        self:raise_error(error_unauthorized_user)
+        self:raise_error(self.error_unauthorized_user)
     end
 
     local doc = self.request.body.document
     if not is_valid_key_field(doc) then
-        self:raise_error(error_document_field_missing)
+        self:raise_error(self.error_document_field_missing)
     end
 
     local percentage = tonumber(self.request.body.percentage)
