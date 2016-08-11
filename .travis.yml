@@ -19,7 +19,7 @@ install:
 
     - sudo apt-get install luarocks redis-server
     # libssl.* are in /usr/lib/x86_64-linux-gnu on Travis Ubuntu precise
-    - sudo luarocks install luasec OPENSSL_LIBDIR=/usr/lib/x86_64-linux-gnu
+    - sudo luarocks install luasec 0.5-2 OPENSSL_LIBDIR=/usr/lib/x86_64-linux-gnu
     - git clone https://github.com/ostinelli/gin
     # patch gin for https support
     - cd gin && patch -N -p1 < ../gin.patch
