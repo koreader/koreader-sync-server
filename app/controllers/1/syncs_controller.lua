@@ -97,9 +97,7 @@ function SyncsController:get_progress()
     end
 
     local key = string.format(self.doc_key, username, doc)
-    local res = {
-      document = doc,
-    }
+    local res = {}
     local results, err = redis:hmget(key,
                                      self.percentage_field,
                                      self.progress_field,
@@ -110,11 +108,27 @@ function SyncsController:get_progress()
         self:raise_error(self.error_internal)
     end
 
-    res.percentage = results[1]
-    res.progress = results[2]
-    res.device = results[3]
-    res.device_id = results[4]
-    res.timpstamp = results[5]
+    if results[1] and results[1] ~= null then
+        res.percentage = tonumber(results[1])
+    end
+    if results[2] and results[2] ~= null then
+        res.progress = results[2]
+    end
+    if results[3] and results[3] ~= null then
+        res.device = results[3]
+    end
+    if results[4] and results[4] ~= null then
+        res.device_id = results[4]
+    end
+    if results[5] and results[5] ~= null then
+        res.timestamp = tonumber(results[5])
+    end
+
+    if next(res) then
+        -- We do not want to have an almost empty table with document field only.
+        res.document = doc
+    end
+
     return 200, res
 end
 
