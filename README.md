@@ -28,6 +28,13 @@ server.
 To setup the server manually, please refer to the commands used in
 [Dockerfile][dockerfile] and [travis config file][travis-conf].
 
+You can use the following command to verify that the sync server is ready to serve traffic:
+
+```bash
+curl -k -v -H "Accept: application/vnd.koreader.v1+json" https://localhost:7200/healthcheck
+# should return {"state":"OK"}
+```
+
 Privacy and security
 ========
 

@@ -22,7 +22,7 @@ local null = ngx.null
 
 -- Whether a field is valid, i.e. not an empty string.
 local function is_valid_field(field)
-    return string.len(field) > 0
+    return type(field) == "string" and string.len(field) > 0
 end
 
 -- Whether a field is valid as a redis key, i.e. not an empty string and contains no colon.
@@ -169,6 +169,10 @@ function SyncsController:update_progress()
     else
         self:raise_error(self.error_invalid_fields)
     end
+end
+
+function SyncsController:healthcheck()
+    return 200, { state = 'OK' }
 end
 
 return SyncsController
