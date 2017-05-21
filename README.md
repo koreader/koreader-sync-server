@@ -19,7 +19,16 @@ Using docker, you can spin up your own server in two commands:
 
 ```bash
 docker build --rm=true --tag=$USER/kosync .
+# for quick test
 docker run -d -p 7200:7200 --name=koreader-sync-server $USER/kosync:latest
+
+# for production, we mount redis data volume to persist state
+mkdir -p ./logs/{redis,app} ./data/redis
+docker run -d -p 7200:7200 \
+    -v `pwd`/logs/app:/app/koreader-sync-server/logs \
+    -v `pwd`/logs/redis:/var/log/redis \
+    -v `pwd`/data/redis:/var/lib/redis \
+    --name=koreader-sync-server $USER/kosync:latest
 ```
 
 The above command will build and spin up a docker container that runs the sync
