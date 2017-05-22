@@ -14,13 +14,12 @@ between devices.
 This project is licenced under Affero GPL v3, see the [COPYING](COPYING) file.
 
 Setup your own server
-========
+======================
 Using docker, you can spin up your own server in two commands:
 
 ```bash
-docker build --rm=true --tag=$USER/kosync .
 # for quick test
-docker run -d -p 7200:7200 --name=koreader-sync-server $USER/kosync:latest
+docker run -d -p 7200:7200 --name=kosync koreader/kosync:latest
 
 # for production, we mount redis data volume to persist state
 mkdir -p ./logs/{redis,app} ./data/redis
@@ -28,11 +27,16 @@ docker run -d -p 7200:7200 \
     -v `pwd`/logs/app:/app/koreader-sync-server/logs \
     -v `pwd`/logs/redis:/var/log/redis \
     -v `pwd`/data/redis:/var/lib/redis \
-    --name=koreader-sync-server $USER/kosync:latest
+    --name=kosync koreader/kosync:latest
 ```
 
-The above command will build and spin up a docker container that runs the sync
-server.
+The above command will spin up a sync server in a docker container.
+
+To build your own docker image from scratch:
+
+```bash
+docker build --rm=true --tag=koreader/kosync .
+```
 
 To setup the server manually, please refer to the commands used in
 [Dockerfile][dockerfile] and [travis config file][travis-conf].
