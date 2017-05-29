@@ -1,38 +1,44 @@
 FROM phusion/baseimage:0.9.22
 
-RUN apt-get update
-
 # install openresty
-RUN apt-get install -y libreadline-dev libncurses5-dev libpcre3-dev libssl-dev \
+RUN apt-get update \
+    && apt-get install --no-install-recommends -y \
+        libreadline-dev libncurses5-dev libpcre3-dev libssl-dev \
         build-essential git openssl \
-        luarocks redis-server
+        luarocks unzip redis-server \
+    && apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 ARG OPENRESTY_VER=1.7.10.1
+ENV PATH /opt/openresty/nginx/sbin:$PATH
 
 WORKDIR /app
-RUN wget "http://openresty.org/download/ngx_openresty-${OPENRESTY_VER}.tar.gz"
-RUN tar zxvf ngx_openresty-${OPENRESTY_VER}.tar.gz
-RUN cd ngx_openresty-${OPENRESTY_VER} && ./configure --prefix=/opt/openresty \
-                            && make && make install
-ENV PATH /opt/openresty/nginx/sbin:$PATH
+RUN wget "http://openresty.org/download/ngx_openresty-${OPENRESTY_VER}.tar.gz" \
+        && tar zxvf ngx_openresty-${OPENRESTY_VER}.tar.gz \
+        && cd ngx_openresty-${OPENRESTY_VER} \
+            && ./configure --prefix=/opt/openresty \
+            && make && make install \
+        && cd .. \
+            && rm -rf ngx_openresty-${OPENRESTY_VER} ngx_openresty-${OPENRESTY_VER}.tar.gz /tmp/*
+
 RUN mkdir -p /etc/nginx/ssl
 RUN openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
     -keyout /etc/nginx/ssl/nginx.key -out /etc/nginx/ssl/nginx.crt -subj "/"
-RUN rm -rf ngx_openresty-${OPENRESTY_VER}.tar.gz ngx_openresty-${OPENRESTY_VER}
 
 # libssl.* are in /usr/lib/x86_64-linux-gnu on Travis Ubuntu precise
-RUN luarocks install luasec OPENSSL_LIBDIR=/usr/lib/x86_64-linux-gnu
-RUN luarocks install redis-lua
-RUN luarocks install busted
+RUN luarocks install --verbose luasocket \
+    && luarocks install luasec OPENSSL_LIBDIR=/usr/lib/x86_64-linux-gnu \
+    && luarocks install redis-lua \
+    && luarocks install busted \
+    && rm -rf /tmp/*
 
-RUN git clone https://github.com/ostinelli/gin
 # add app source code
-ADD ./ koreader-sync-server
+COPY ./ koreader-sync-server
 
 # patch gin for https support
-RUN cd gin && patch -N -p1 < ../koreader-sync-server/gin.patch
-RUN cd gin && luarocks make
-RUN rm -rf gin
+RUN git clone https://github.com/ostinelli/gin \
+    && cd gin && patch -N -p1 < ../koreader-sync-server/gin.patch \
+    && luarocks make \
+    && rm -rf gin /tmp/*
 
 # create daemons
 RUN mkdir /etc/service/redis-server
@@ -49,10 +55,6 @@ RUN mkdir /etc/service/koreader-sync-server
 RUN echo -n "#!/bin/sh\ncd /app/koreader-sync-server\nexec gin start" > \
         /etc/service/koreader-sync-server/run
 RUN chmod +x /etc/service/koreader-sync-server/run
-
-
-# Clean up APT when done.
-RUN apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 VOLUME ["/var/log/redis", "/var/lib/redis"]
 
