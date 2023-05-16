@@ -1,4 +1,4 @@
-FROM phusion/baseimage:0.9.22
+FROM phusion/baseimage:jammy-1.0.1
 
 # install openresty
 RUN apt-get update \
@@ -6,19 +6,20 @@ RUN apt-get update \
         libreadline-dev libncurses5-dev libpcre3-dev libssl-dev \
         build-essential git openssl \
         luarocks unzip redis-server \
+        zlib1g-dev \
     && apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
-ARG OPENRESTY_VER=1.7.10.1
+ARG OPENRESTY_VER=1.21.4.1
 ENV PATH /opt/openresty/nginx/sbin:$PATH
 
 WORKDIR /app
-RUN wget "http://openresty.org/download/ngx_openresty-${OPENRESTY_VER}.tar.gz" \
-        && tar zxvf ngx_openresty-${OPENRESTY_VER}.tar.gz \
-        && cd ngx_openresty-${OPENRESTY_VER} \
+RUN wget "http://openresty.org/download/openresty-${OPENRESTY_VER}.tar.gz" \
+        && tar zxvf openresty-${OPENRESTY_VER}.tar.gz \
+        && cd openresty-${OPENRESTY_VER} \
             && ./configure --prefix=/opt/openresty \
             && make && make install \
         && cd .. \
-            && rm -rf ngx_openresty-${OPENRESTY_VER} ngx_openresty-${OPENRESTY_VER}.tar.gz /tmp/*
+            && rm -rf openresty-${OPENRESTY_VER} openresty-${OPENRESTY_VER}.tar.gz /tmp/*
 
 RUN mkdir -p /etc/nginx/ssl
 RUN openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
@@ -36,8 +37,7 @@ COPY ./ koreader-sync-server
 
 # patch gin for https support
 RUN git clone https://github.com/ostinelli/gin \
-    && cd gin && patch -N -p1 < ../koreader-sync-server/gin.patch \
-    && luarocks make \
+    && cd gin && luarocks make \
     && rm -rf gin /tmp/*
 
 # create daemons
