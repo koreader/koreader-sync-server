@@ -1,0 +1,13 @@
+version: '3.3'
+
+services:
+  kosync:
+    image: koreader/kosync:latest
+    container_name: kosync
+    ports:
+      - 7200:7200
+    volumes:
+      - ./logs/app:/app/koreader-sync-server/logs
+      - ./logs/redis:/var/log/redis
+      - ./data/redis:/var/lib/redis
+
