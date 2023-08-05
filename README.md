@@ -38,6 +38,12 @@ To build your own docker image from scratch:
 docker build --rm=true --tag=koreader/kosync .
 ```
 
+Alternatively, if you'd rather use docker compose:
+
+```bash
+docker compose up -d --build
+```
+
 To setup the server manually, please refer to the commands used in
 [Dockerfile][dockerfile] and [travis config file][travis-conf].
 
