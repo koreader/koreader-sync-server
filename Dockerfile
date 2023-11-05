@@ -1,4 +1,26 @@
-FROM phusion/baseimage:jammy-1.0.1
+FROM ubuntu:jammy as builder
+
+WORKDIR /root
+
+RUN apt-get update && \
+    apt-get install --no-install-recommends -y \
+        git ca-certificates
+
+RUN git clone --branch master --single-branch https://github.com/phusion/baseimage-docker.git && \
+    git clone --branch master --single-branch https://github.com/koreader/koreader-sync-server.git
+
+FROM ubuntu:jammy
+COPY --from=builder /root/baseimage-docker/image /bd_build
+
+RUN /bd_build/prepare.sh && \
+        /bd_build/system_services.sh && \
+        /bd_build/utilities.sh && \
+        /bd_build/cleanup.sh
+
+ENV DEBIAN_FRONTEND="teletype" \
+    LANG="en_US.UTF-8" \
+    LANGUAGE="en_US:en" \
+    LC_ALL="en_US.UTF-8"
 
 # install openresty
 RUN apt-get update \
@@ -33,7 +55,7 @@ RUN luarocks install --verbose luasocket \
     && rm -rf /tmp/*
 
 # add app source code
-COPY ./ koreader-sync-server
+COPY --from=builder /root/koreader-sync-server/ /app/koreader-sync-server
 
 # patch gin for https support
 RUN git clone https://github.com/ostinelli/gin \
