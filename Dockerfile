@@ -1,21 +1,25 @@
-FROM ubuntu:jammy as builder
-
-WORKDIR /root
-
-RUN apt-get update && \
-    apt-get install --no-install-recommends -y \
-        git ca-certificates
-
-RUN git clone --branch master --single-branch https://github.com/phusion/baseimage-docker.git && \
-    git clone --branch master --single-branch https://github.com/koreader/koreader-sync-server.git
-
 FROM ubuntu:jammy
-COPY --from=builder /root/baseimage-docker/image /bd_build
+
+RUN mkdir -p /bd_build/bin/
+
+ADD https://raw.githubusercontent.com/phusion/baseimage-docker/cc3f8f6fc8847a101efaf9008a892124b4ba14dc/image/buildconfig /bd_build/
+ADD --chmod=755 https://raw.githubusercontent.com/phusion/baseimage-docker/cc3f8f6fc8847a101efaf9008a892124b4ba14dc/image/cleanup.sh /bd_build/
+ADD --chmod=755 https://raw.githubusercontent.com/phusion/baseimage-docker/cc3f8f6fc8847a101efaf9008a892124b4ba14dc/image/prepare.sh /bd_build/
+ADD --chmod=755 https://raw.githubusercontent.com/phusion/baseimage-docker/cc3f8f6fc8847a101efaf9008a892124b4ba14dc/image/system_services.sh /bd_build/
+ADD --chmod=755 https://raw.githubusercontent.com/phusion/baseimage-docker/cc3f8f6fc8847a101efaf9008a892124b4ba14dc/image/utilities.sh /bd_build/
+
+ADD --chmod=755 https://raw.githubusercontent.com/phusion/baseimage-docker/cc3f8f6fc8847a101efaf9008a892124b4ba14dc/image/bin/install_clean /bd_build/bin/
+ADD --chmod=755 https://raw.githubusercontent.com/phusion/baseimage-docker/cc3f8f6fc8847a101efaf9008a892124b4ba14dc/image/bin/my_init /bd_build/bin/
+ADD --chmod=755 https://raw.githubusercontent.com/phusion/baseimage-docker/cc3f8f6fc8847a101efaf9008a892124b4ba14dc/image/bin/setuser /bd_build/bin/
+
+ENV DISABLE_CRON=1
+ENV DISABLE_SSH=1
+ENV DISABLE_SYSLOG=1
 
 RUN /bd_build/prepare.sh && \
-        /bd_build/system_services.sh && \
-        /bd_build/utilities.sh && \
-        /bd_build/cleanup.sh
+    /bd_build/system_services.sh && \
+    /bd_build/utilities.sh && \
+    /bd_build/cleanup.sh
 
 ENV DEBIAN_FRONTEND="teletype" \
     LANG="en_US.UTF-8" \
@@ -55,7 +59,7 @@ RUN luarocks install --verbose luasocket \
     && rm -rf /tmp/*
 
 # add app source code
-COPY --from=builder /root/koreader-sync-server/ /app/koreader-sync-server
+COPY ./ koreader-sync-server
 
 # patch gin for https support
 RUN git clone https://github.com/ostinelli/gin \
