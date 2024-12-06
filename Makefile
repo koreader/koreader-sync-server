@@ -1,4 +1,4 @@
-VERSION=1.0.1.3
+VERSION=2.0
 
 build:
 	docker build --rm=true --tag=koreader/kosync:$(VERSION) .
