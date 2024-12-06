@@ -27,7 +27,7 @@ RUN openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
 
 # libssl.* are in /usr/lib/x86_64-linux-gnu on Travis Ubuntu precise
 RUN luarocks install --verbose luasocket \
-    && luarocks install luasec OPENSSL_LIBDIR=/usr/lib/x86_64-linux-gnu \
+    && luarocks install luasec \
     && luarocks install redis-lua \
     && luarocks install busted \
     && rm -rf /tmp/*
