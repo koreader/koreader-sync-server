@@ -54,6 +54,17 @@ curl -k -v -H "Accept: application/vnd.koreader.v1+json" https://localhost:7200/
 # should return {"state":"OK"}
 ```
 
+As you can see, the server responds over HTTPS using a self-signed certificate. If you'd like to run the server behind a reverse proxy and let the proxy handle TLS termination, run the server on port `17200` instead of `7200`. As an example, your Traefik V3 configuration could look like this:
+
+```bash
+  kosync:
+    # ...
+    labels:
+      - traefik.enable=true
+      - 'traefik.http.routers.kosync.rule=Host(`kosync.example.com`)'
+      - 'traefik.http.services.kosync.loadbalancer.server.port=17200'
+```
+
 Privacy and security
 ========
 
