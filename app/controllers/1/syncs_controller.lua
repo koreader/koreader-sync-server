@@ -1,4 +1,6 @@
 local Redis = require "db.redis"
+local Gin = require 'gin.core.gin'
+local Settings = require 'config.settings'
 
 local SyncsController = {
     user_key = "user:%s:key",
@@ -16,6 +18,7 @@ local SyncsController = {
     error_invalid_fields = 2003,
     -- Do we really need to handle 'document' field specifically?
     error_document_field_missing = 2004,
+    error_user_registration_disabled = 2005,
 }
 
 local null = ngx.null
@@ -61,6 +64,10 @@ end
 
 function SyncsController:create_user()
     local redis = self:getRedis()
+
+    if not Settings[Gin.env].enable_create_user then
+        self:raise_error(self.error_user_registration_disabled)
+    end
 
     if not is_valid_key_field(self.request.body.username)
     or not is_valid_field(self.request.body.password) then
