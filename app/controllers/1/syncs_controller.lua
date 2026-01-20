@@ -16,6 +16,7 @@ local SyncsController = {
     error_invalid_fields = 2003,
     -- Do we really need to handle 'document' field specifically?
     error_document_field_missing = 2004,
+    error_user_registration_disabled = 2005,
 }
 
 local null = ngx.null
@@ -81,6 +82,10 @@ function SyncsController:create_user()
     else
         self:raise_error(self.error_internal)
     end
+end
+
+function SyncsController:create_user_disabled()
+    self:raise_error(self.error_user_registration_disabled)
 end
 
 function SyncsController:get_progress()
