@@ -72,6 +72,8 @@ RUN echo -n "#!/bin/sh\nexec redis-server /app/koreader-sync-server/config/redis
         /etc/service/redis-server/run
 RUN chmod +x /etc/service/redis-server/run
 
+ARG ENABLE_USER_REGISTRATION=true
+ENV ENABLE_USER_REGISTRATION ${ENABLE_USER_REGISTRATION}
 
 # run gin in production mode
 ENV GIN_ENV production

@@ -6,6 +6,8 @@ services:
     container_name: kosync
     ports:
       - 7200:7200
+    environment:
+        - ENABLE_USER_REGISTRATION=true
     volumes:
       - ./logs/app:/app/koreader-sync-server/logs
       - ./logs/redis:/var/log/redis
