@@ -4,7 +4,12 @@ local routes = require 'gin.core.routes'
 local v1 = routes.version(1)
 
 -- define routes
-v1:POST("/users/create", { controller = "syncs", action = "create_user" })
+local enable_user_registration = os.getenv("ENABLE_USER_REGISTRATION")
+if enable_user_registration == "true" or enable_user_registration == "1" then
+    v1:POST("/users/create", { controller = "syncs", action = "create_user" })
+else
+    v1:POST("/users/create", { controller = "syncs", action = "create_user_disabled" })
+end
 v1:GET("/users/auth", { controller = "syncs", action = "auth_user" })
 v1:PUT("/syncs/progress", { controller = "syncs", action = "update_progress" })
 v1:GET("/syncs/progress/:document", { controller = "syncs", action = "get_progress" })
