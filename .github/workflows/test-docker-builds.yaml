@@ -1,0 +1,32 @@
+name: Docker Build Test
+
+on:
+  pull_request:
+    branches:
+      - '**'
+
+jobs:
+  docker-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Build with Docker Buildx
+        run: |
+          docker buildx build --load -t koreader-sync-server:test-buildx .
+
+      - name: Test Buildx image runs
+        run: |
+          docker run --rm koreader-sync-server:test-buildx echo "Buildx build successful"
+
+      - name: Build with standard Docker (buildkit disabled)
+        run: |
+          DOCKER_BUILDKIT=0 docker build -t koreader-sync-server:test-standard .
+
+      - name: Test standard Docker image runs
+        run: |
+          docker run --rm koreader-sync-server:test-standard echo "Standard build successful"
