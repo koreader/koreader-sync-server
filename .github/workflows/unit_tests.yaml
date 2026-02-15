@@ -31,7 +31,5 @@ jobs:
         run: |
           docker run -d --name kosync-test app:test
           sleep 5
-          response=$(docker exec kosync-test wget -qO- --no-check-certificate --header="Accept: application/vnd.koreader.v1+json" https://127.0.0.1:7200/healthcheck)
+          docker exec kosync-test /app/koreader-sync-server/scripts/healthcheck.sh
           docker stop kosync-test
-          echo "$response"
-          echo "$response" | grep -q '"state":"OK"'

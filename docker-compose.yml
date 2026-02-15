@@ -1,5 +1,3 @@
-version: '3.3'
-
 services:
   kosync:
     image: koreader/kosync:latest

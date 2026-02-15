@@ -25,3 +25,7 @@ tmtags
 
 # Redis
 *.rdb
+
+# Docker volumes
+data
+
