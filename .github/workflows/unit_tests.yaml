@@ -26,3 +26,12 @@ jobs:
       - name: Run busted test suite
         run: |
           docker run --rm app:test /app/koreader-sync-server/scripts/run_tests.sh
+
+      - name: Verify production healthcheck
+        run: |
+          docker run -d --name kosync-test app:test
+          sleep 5
+          response=$(docker exec kosync-test curl -sf -H "Accept: application/vnd.koreader.v1+json" https://127.0.0.1:7200/healthcheck)
+          docker stop kosync-test
+          echo "$response"
+          echo "$response" | grep -q '"state":"OK"'
