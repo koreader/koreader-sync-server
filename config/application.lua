@@ -1,6 +1,6 @@
 local Application = {
     name = "koreader",
-    version = '1.0.1'
+    version = '2.0'
 }
 
 return Application
