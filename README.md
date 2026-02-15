@@ -1,4 +1,3 @@
-[![Build Status][travis-badge]][travis-link]
 [![AGPL Licence][licence-badge]](COPYING)
 Koreader Sync Server
 ========
@@ -45,7 +44,7 @@ docker compose up -d --build
 ```
 
 To setup the server manually, please refer to the commands used in
-[Dockerfile][dockerfile] and [travis config file][travis-conf].
+the [Dockerfile][dockerfile].
 
 You can use the following command to verify that the sync server is ready to serve traffic:
 
@@ -87,8 +86,5 @@ the password is MD5 hashed at client when authorizing with the sync server.
 In addition, all data transferred between koreader devices and the sync server
 are secured by HTTPS (Hypertext Transfer Protocol Secure) connections.
 
-[travis-badge]:https://travis-ci.org/koreader/koreader-sync-server.svg?branch=master
-[travis-link]:https://travis-ci.org/koreader/koreader-sync-server
-[travis-conf]:https://github.com/koreader/koreader-sync-server/blob/master/.travis.yml
 [licence-badge]:http://img.shields.io/badge/licence-AGPL-brightgreen.svg
 [dockerfile]:https://github.com/koreader/koreader-sync-server/blob/master/Dockerfile
