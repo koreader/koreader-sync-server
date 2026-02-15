@@ -2,15 +2,16 @@ FROM ubuntu:jammy
 
 RUN mkdir -p /bd_build/bin/
 
-ADD https://raw.githubusercontent.com/phusion/baseimage-docker/cc3f8f6fc8847a101efaf9008a892124b4ba14dc/image/buildconfig /bd_build/
-ADD --chmod=755 https://raw.githubusercontent.com/phusion/baseimage-docker/cc3f8f6fc8847a101efaf9008a892124b4ba14dc/image/cleanup.sh /bd_build/
-ADD --chmod=755 https://raw.githubusercontent.com/phusion/baseimage-docker/cc3f8f6fc8847a101efaf9008a892124b4ba14dc/image/prepare.sh /bd_build/
-ADD --chmod=755 https://raw.githubusercontent.com/phusion/baseimage-docker/cc3f8f6fc8847a101efaf9008a892124b4ba14dc/image/system_services.sh /bd_build/
-ADD --chmod=755 https://raw.githubusercontent.com/phusion/baseimage-docker/cc3f8f6fc8847a101efaf9008a892124b4ba14dc/image/utilities.sh /bd_build/
-
-ADD --chmod=755 https://raw.githubusercontent.com/phusion/baseimage-docker/cc3f8f6fc8847a101efaf9008a892124b4ba14dc/image/bin/install_clean /bd_build/bin/
-ADD --chmod=755 https://raw.githubusercontent.com/phusion/baseimage-docker/cc3f8f6fc8847a101efaf9008a892124b4ba14dc/image/bin/my_init /bd_build/bin/
-ADD --chmod=755 https://raw.githubusercontent.com/phusion/baseimage-docker/cc3f8f6fc8847a101efaf9008a892124b4ba14dc/image/bin/setuser /bd_build/bin/
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+RUN curl -fsSL https://raw.githubusercontent.com/phusion/baseimage-docker/cc3f8f6fc8847a101efaf9008a892124b4ba14dc/image/buildconfig -o /bd_build/buildconfig \
+    && curl -fsSL https://raw.githubusercontent.com/phusion/baseimage-docker/cc3f8f6fc8847a101efaf9008a892124b4ba14dc/image/cleanup.sh -o /bd_build/cleanup.sh \
+    && curl -fsSL https://raw.githubusercontent.com/phusion/baseimage-docker/cc3f8f6fc8847a101efaf9008a892124b4ba14dc/image/prepare.sh -o /bd_build/prepare.sh \
+    && curl -fsSL https://raw.githubusercontent.com/phusion/baseimage-docker/cc3f8f6fc8847a101efaf9008a892124b4ba14dc/image/system_services.sh -o /bd_build/system_services.sh \
+    && curl -fsSL https://raw.githubusercontent.com/phusion/baseimage-docker/cc3f8f6fc8847a101efaf9008a892124b4ba14dc/image/utilities.sh -o /bd_build/utilities.sh \
+    && curl -fsSL https://raw.githubusercontent.com/phusion/baseimage-docker/cc3f8f6fc8847a101efaf9008a892124b4ba14dc/image/bin/install_clean -o /bd_build/bin/install_clean \
+    && curl -fsSL https://raw.githubusercontent.com/phusion/baseimage-docker/cc3f8f6fc8847a101efaf9008a892124b4ba14dc/image/bin/my_init -o /bd_build/bin/my_init \
+    && curl -fsSL https://raw.githubusercontent.com/phusion/baseimage-docker/cc3f8f6fc8847a101efaf9008a892124b4ba14dc/image/bin/setuser -o /bd_build/bin/setuser \
+    && chmod +x /bd_build/*.sh /bd_build/bin/*
 
 ENV DISABLE_CRON=1
 ENV DISABLE_SSH=1
@@ -51,20 +52,25 @@ RUN mkdir -p /etc/nginx/ssl
 RUN openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
     -keyout /etc/nginx/ssl/nginx.key -out /etc/nginx/ssl/nginx.crt -subj "/"
 
-# libssl.* are in /usr/lib/x86_64-linux-gnu on Travis Ubuntu precise
+# install lua dependencies
 RUN luarocks install --verbose luasocket \
     && luarocks install luasec \
     && luarocks install redis-lua \
-    && luarocks install busted \
     && rm -rf /tmp/*
 
 # add app source code
 COPY ./ koreader-sync-server
 
-# patch gin for https support
+# install gin with https support patch
 RUN git clone https://github.com/ostinelli/gin \
-    && cd gin && luarocks make \
-    && rm -rf gin /tmp/*
+    && cd gin \
+    && patch -N -p1 < /app/koreader-sync-server/gin.patch \
+    && luarocks make --tree=/usr/local \
+    && cd .. \
+    && rm -rf gin
+
+# install busted after gin to avoid gin's pinned old version overwriting it
+RUN luarocks install busted
 
 # create daemons
 RUN mkdir /etc/service/redis-server
@@ -76,10 +82,9 @@ ENV ENABLE_USER_REGISTRATION=true
 
 # run gin in production mode
 ENV GIN_ENV production
-# run gin in foreground
-RUN echo "daemon off;" >> koreader-sync-server/config/nginx.conf
+# append 'daemon off;' at runtime so tests can still use the config normally
 RUN mkdir /etc/service/koreader-sync-server
-RUN echo -n "#!/bin/sh\ncd /app/koreader-sync-server\nexec gin start" > \
+RUN echo -n "#!/bin/sh\ngrep -q 'daemon off;' /app/koreader-sync-server/config/nginx.conf || echo 'daemon off;' >> /app/koreader-sync-server/config/nginx.conf\ncd /app/koreader-sync-server\nexec gin start" > \
         /etc/service/koreader-sync-server/run
 RUN chmod +x /etc/service/koreader-sync-server/run
 
