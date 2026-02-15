@@ -2,15 +2,16 @@ FROM ubuntu:jammy
 
 RUN mkdir -p /bd_build/bin/
 
-ADD https://raw.githubusercontent.com/phusion/baseimage-docker/cc3f8f6fc8847a101efaf9008a892124b4ba14dc/image/buildconfig /bd_build/
-ADD --chmod=755 https://raw.githubusercontent.com/phusion/baseimage-docker/cc3f8f6fc8847a101efaf9008a892124b4ba14dc/image/cleanup.sh /bd_build/
-ADD --chmod=755 https://raw.githubusercontent.com/phusion/baseimage-docker/cc3f8f6fc8847a101efaf9008a892124b4ba14dc/image/prepare.sh /bd_build/
-ADD --chmod=755 https://raw.githubusercontent.com/phusion/baseimage-docker/cc3f8f6fc8847a101efaf9008a892124b4ba14dc/image/system_services.sh /bd_build/
-ADD --chmod=755 https://raw.githubusercontent.com/phusion/baseimage-docker/cc3f8f6fc8847a101efaf9008a892124b4ba14dc/image/utilities.sh /bd_build/
-
-ADD --chmod=755 https://raw.githubusercontent.com/phusion/baseimage-docker/cc3f8f6fc8847a101efaf9008a892124b4ba14dc/image/bin/install_clean /bd_build/bin/
-ADD --chmod=755 https://raw.githubusercontent.com/phusion/baseimage-docker/cc3f8f6fc8847a101efaf9008a892124b4ba14dc/image/bin/my_init /bd_build/bin/
-ADD --chmod=755 https://raw.githubusercontent.com/phusion/baseimage-docker/cc3f8f6fc8847a101efaf9008a892124b4ba14dc/image/bin/setuser /bd_build/bin/
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+RUN curl -fsSL https://raw.githubusercontent.com/phusion/baseimage-docker/cc3f8f6fc8847a101efaf9008a892124b4ba14dc/image/buildconfig -o /bd_build/buildconfig \
+    && curl -fsSL https://raw.githubusercontent.com/phusion/baseimage-docker/cc3f8f6fc8847a101efaf9008a892124b4ba14dc/image/cleanup.sh -o /bd_build/cleanup.sh \
+    && curl -fsSL https://raw.githubusercontent.com/phusion/baseimage-docker/cc3f8f6fc8847a101efaf9008a892124b4ba14dc/image/prepare.sh -o /bd_build/prepare.sh \
+    && curl -fsSL https://raw.githubusercontent.com/phusion/baseimage-docker/cc3f8f6fc8847a101efaf9008a892124b4ba14dc/image/system_services.sh -o /bd_build/system_services.sh \
+    && curl -fsSL https://raw.githubusercontent.com/phusion/baseimage-docker/cc3f8f6fc8847a101efaf9008a892124b4ba14dc/image/utilities.sh -o /bd_build/utilities.sh \
+    && curl -fsSL https://raw.githubusercontent.com/phusion/baseimage-docker/cc3f8f6fc8847a101efaf9008a892124b4ba14dc/image/bin/install_clean -o /bd_build/bin/install_clean \
+    && curl -fsSL https://raw.githubusercontent.com/phusion/baseimage-docker/cc3f8f6fc8847a101efaf9008a892124b4ba14dc/image/bin/my_init -o /bd_build/bin/my_init \
+    && curl -fsSL https://raw.githubusercontent.com/phusion/baseimage-docker/cc3f8f6fc8847a101efaf9008a892124b4ba14dc/image/bin/setuser -o /bd_build/bin/setuser \
+    && chmod +x /bd_build/*.sh /bd_build/bin/*
 
 ENV DISABLE_CRON=1
 ENV DISABLE_SSH=1
