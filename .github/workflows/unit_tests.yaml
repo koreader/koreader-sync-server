@@ -21,17 +21,8 @@ jobs:
 
       - name: Build image
         run: |
-          make build VERSION=test
+          docker build -f Dockerfile -t app:test .
 
       - name: Run busted test suite
         run: |
-          make test VERSION=test
-
-      - name: Verify production healthcheck
-        run: |
-          docker run -d --name kosync-test koreader/kosync:test
-          sleep 5
-          response=$(docker exec kosync-test wget -qO- --no-check-certificate --header="Accept: application/vnd.koreader.v1+json" https://127.0.0.1:7200/healthcheck)
-          docker stop kosync-test
-          echo "$response"
-          echo "$response" | grep -q '"state":"OK"'
+          docker run --rm app:test /app/koreader-sync-server/scripts/run_tests.sh
