@@ -63,6 +63,7 @@ COPY ./ koreader-sync-server
 # install gin with https support patch
 RUN git clone https://github.com/ostinelli/gin \
     && cd gin \
+    && patch -N -p1 < /app/koreader-sync-server/gin.patch \
     && luarocks make --tree=/usr/local \
     && cd .. \
     && rm -rf gin
