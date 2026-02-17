@@ -21,7 +21,7 @@ jobs:
 
       - name: Build image
         run: |
-          docker build -f Dockerfile -t app:test .
+          make build VERSION=test
 
       - name: Run busted test suite
         run: |

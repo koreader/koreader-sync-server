@@ -7,3 +7,8 @@ build:
 push:
 	docker push koreader/kosync:$(VERSION)
 	docker push koreader/kosync:latest
+
+.PHONY: test
+test:
+    docker run --rm koreader/kosync:$(VERSION) /app/koreader-sync-server/scripts/run_tests.sh
+
