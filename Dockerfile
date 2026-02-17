@@ -51,12 +51,6 @@ RUN mkdir -p /etc/nginx/ssl
 RUN openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
     -keyout /etc/nginx/ssl/nginx.key -out /etc/nginx/ssl/nginx.crt -subj "/"
 
-# install lua dependencies
-RUN luarocks install --verbose luasocket \
-    && luarocks install luasec \
-    && luarocks install redis-lua \
-    && rm -rf /tmp/*
-
 # add app source code
 COPY ./ koreader-sync-server
 
@@ -68,8 +62,12 @@ RUN git clone https://github.com/ostinelli/gin \
     && cd .. \
     && rm -rf gin
 
-# install busted after gin to avoid gin's pinned old version overwriting it
-RUN luarocks install busted
+# install lua dependencies after gin to avoid gin's pinned old versions overwriting them
+RUN luarocks install luasocket \
+    && luarocks install luasec \
+    && luarocks install redis-lua \
+    && luarocks install busted \
+    && rm -rf /tmp/*
 
 # create daemons
 RUN mkdir /etc/service/redis-server
