@@ -19,7 +19,7 @@ describe("SyncsController", function()
 
     local function register(username, userkey)
         local response = hit({
-            scheme = "https",
+
             method = "POST",
             path = "/users/create",
             body = { username = username, password = userkey },
@@ -30,7 +30,7 @@ describe("SyncsController", function()
 
     local function authorize(username, userkey)
         local response = hit({
-            scheme = "https",
+
             method = "GET",
             path = "/users/auth",
             headers = {
@@ -44,7 +44,7 @@ describe("SyncsController", function()
 
     local function get(username, userkey, document)
         local response = hit({
-            scheme = "https",
+
             method = "GET",
             path = "/syncs/progress/" .. document,
             headers = {
@@ -58,7 +58,7 @@ describe("SyncsController", function()
 
     local function update(username, userkey, document, percentage, progress, device)
         local response = hit({
-            scheme = "https",
+
             method = "PUT",
             path = "/syncs/progress",
             headers = {
