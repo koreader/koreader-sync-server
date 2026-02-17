@@ -54,9 +54,10 @@ RUN openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
 # add app source code
 COPY ./ koreader-sync-server
 
-# install gin with test runner
+# install gin with test runner patch to use HTTP port
 RUN git clone https://github.com/ostinelli/gin \
     && cd gin \
+    && patch -N -p1 < /app/koreader-sync-server/gin.patch \
     && luarocks make --tree=/usr/local \
     && cd .. \
     && rm -rf gin

@@ -19,7 +19,7 @@ describe("SyncsController", function()
 
     local function register(username, userkey)
         local response = hit({
-            scheme = "https",
+
             method = "POST",
             path = "/users/create",
             body = { username = username, password = userkey },
@@ -30,7 +30,7 @@ describe("SyncsController", function()
 
     local function authorize(username, userkey)
         local response = hit({
-            scheme = "https",
+
             method = "GET",
             path = "/users/auth",
             headers = {
@@ -44,7 +44,7 @@ describe("SyncsController", function()
 
     local function get(username, userkey, document)
         local response = hit({
-            scheme = "https",
+
             method = "GET",
             path = "/syncs/progress/" .. document,
             headers = {
@@ -58,7 +58,7 @@ describe("SyncsController", function()
 
     local function update(username, userkey, document, percentage, progress, device)
         local response = hit({
-            scheme = "https",
+
             method = "PUT",
             path = "/syncs/progress",
             headers = {
@@ -101,10 +101,10 @@ describe("SyncsController", function()
             local response = register(username, userkey)
             response = authorize(username, "")
             assert.are.same(401, response.status)
-            assert.are.same({ code = 2001, message = "Unauthorized" }, response.body)
+            assert.are.same({code = 2001, message = "Unauthorized"}, response.body)
             response = authorize(username, "wrong_password")
             assert.are.same(401, response.status)
-            assert.are.same({ code = 2001, message = "Unauthorized" }, response.body)
+            assert.are.same({code = 2001, message = "Unauthorized"}, response.body)
             response = authorize(username, userkey)
             assert.are.same(200, response.status)
             assert.are.same("OK", response.body.authorized)
@@ -117,15 +117,15 @@ describe("SyncsController", function()
             register(username, userkey)
         end)
         it("should authorize itself before getting progress", function()
-            local response = get(username, userkey .. "wrong_pass", doc)
+            local response = get(username, userkey.."wrong_pass", doc)
             assert.are.same(401, response.status)
-            assert.are.same({ code = 2001, message = "Unauthorized" }, response.body)
+            assert.are.same({code = 2001, message = "Unauthorized"}, response.body)
         end)
         it("should authorize itself before updating progress", function()
-            local response = update(username, userkey .. "wrong_pass",
+            local response = update(username, userkey.."wrong_pass",
                 doc, 0.32, "56", "my kpw")
             assert.are.same(401, response.status)
-            assert.are.same({ code = 2001, message = "Unauthorized" }, response.body)
+            assert.are.same({code = 2001, message = "Unauthorized"}, response.body)
         end)
         it("should update document progress", function()
             local response = update(username, userkey, doc, 0.32, "56", "my kpw")
