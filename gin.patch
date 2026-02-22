@@ -1,13 +1,15 @@
 diff --git a/gin/spec/runners/integration.lua b/gin/spec/runners/integration.lua
-index 5ef537a..f8a1d2c 100644
+index 5ef537a..21ec8f9 100644
 --- a/gin/spec/runners/integration.lua
 +++ b/gin/spec/runners/integration.lua
-@@ -85,7 +85,7 @@ local function hit_server(request)
+@@ -82,8 +83,9 @@ local function set_accept_header(request, api_version)
+ end
+
+ local function hit_server(request)
++    local scheme = request.scheme or 'http'
      local full_url = url.build({
-         scheme = 'http',
+-        scheme = 'http',
++        scheme = scheme,
          host = '127.0.0.1',
--        port = Gin.settings.port,
-+        port = tonumber('1' .. tostring(Gin.settings.port)),
+         port = Gin.settings.port,
          path = request.path,
-         query = IntegrationRunner.encode_table(request.uri_params)
-     })
