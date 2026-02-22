@@ -29,7 +29,7 @@ jobs:
 
       - name: Verify production healthcheck
         run: |
-          docker run -d --name kosync-test kosync:test
+          docker run -d --name kosync-test koreader/kosync:test
           sleep 5
           response=$(docker exec kosync-test wget -qO- --no-check-certificate --header="Accept: application/vnd.koreader.v1+json" https://127.0.0.1:7200/healthcheck)
           docker stop kosync-test
