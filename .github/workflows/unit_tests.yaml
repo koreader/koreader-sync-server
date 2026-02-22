@@ -25,7 +25,7 @@ jobs:
 
       - name: Run busted test suite
         run: |
-          docker run --rm koreader:test /app/koreader-sync-server/scripts/run_tests.sh
+          docker run --rm koreader/kosync:test /app/koreader-sync-server/scripts/run_tests.sh
 
       - name: Verify production healthcheck
         run: |
