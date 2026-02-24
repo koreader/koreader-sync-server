@@ -10,5 +10,5 @@ push:
 
 .PHONY: test
 test:
-    docker run --rm koreader/kosync:$(VERSION) /app/koreader-sync-server/scripts/run_tests.sh
+	docker run --rm koreader/kosync:$(VERSION) /app/koreader-sync-server/scripts/run_tests.sh
 
