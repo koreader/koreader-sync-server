@@ -27,6 +27,6 @@ jobs:
 
       - name: Verify production healthcheck
         run: |
-          docker run -d --name kosync-test app:test
+          docker run -d --name kosync-test koreader/kosync:test
           sleep 5
           docker exec kosync-test /app/koreader-sync-server/scripts/healthcheck.sh
