@@ -28,7 +28,7 @@ RUN mkdir -p /etc/nginx/ssl \
 # add app source code
 COPY ./ koreader-sync-server
 
-# install gin with test runner patch to use HTTP port
+# patch gin for https support
 RUN git clone https://github.com/ostinelli/gin \
     && cd gin \
     && patch -N -p1 < /app/koreader-sync-server/gin.patch \
