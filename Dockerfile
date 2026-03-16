@@ -10,7 +10,7 @@ RUN apt-get update \
     && apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 ARG OPENRESTY_VER=1.27.1.2
-ENV PATH /opt/openresty/nginx/sbin:$PATH
+ENV PATH=/opt/openresty/nginx/sbin:$PATH
 
 WORKDIR /app
 RUN wget "https://openresty.org/download/openresty-${OPENRESTY_VER}.tar.gz" \
@@ -25,13 +25,13 @@ RUN mkdir -p /etc/nginx/ssl \
     && openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
         -keyout /etc/nginx/ssl/nginx.key -out /etc/nginx/ssl/nginx.crt -subj "/"
 
-# add app source code
-COPY ./ koreader-sync-server
+# copy only the patch needed for the gin build step
+COPY gin.patch /tmp/gin.patch
 
 # patch gin for https support
 RUN git clone https://github.com/ostinelli/gin \
     && cd gin \
-    && patch -N -p1 < /app/koreader-sync-server/gin.patch \
+    && patch -N -p1 < /tmp/gin.patch \
     && luarocks make --tree=/usr/local \
     && cd .. \
     && rm -rf gin
@@ -58,6 +58,9 @@ RUN mkdir /etc/service/koreader-sync-server \
     && echo -n "#!/bin/sh\ngrep -q 'daemon off;' /app/koreader-sync-server/config/nginx.conf || echo 'daemon off;' >> /app/koreader-sync-server/config/nginx.conf\ncd /app/koreader-sync-server\nexec gin start" > \
         /etc/service/koreader-sync-server/run \
     && chmod +x /etc/service/koreader-sync-server/run
+
+# add app source code last so app changes don't invalidate dependency layers
+COPY ./ koreader-sync-server
 
 VOLUME ["/var/log/redis", "/var/lib/redis"]
 
