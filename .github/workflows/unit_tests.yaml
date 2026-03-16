@@ -21,11 +21,11 @@ jobs:
 
       - name: Build image
         run: |
-          docker build -f Dockerfile -t app:test .
+          make build VERSION=test
 
       - name: Run busted test suite
         run: |
-          docker run --rm app:test /app/koreader-sync-server/scripts/run_tests.sh
+          make test VERSION=test
 
       - name: Verify production healthcheck
         run: |
