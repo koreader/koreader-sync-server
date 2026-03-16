@@ -1,9 +1,6 @@
 name: Busted test suite
 
-on:
-  pull_request:
-    branches:
-      - "**"
+on: [push, pull_request]
 
 jobs:
   build-and-test:
