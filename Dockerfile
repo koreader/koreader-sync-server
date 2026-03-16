@@ -63,7 +63,8 @@ RUN git clone https://github.com/ostinelli/gin \
     && rm -rf gin
 
 # install lua dependencies after gin to avoid gin's pinned old versions overwriting them
-RUN luarocks install luasocket \
+RUN luarocks remove --force luasocket 3.0rc1-2 \
+    && luarocks install luasocket \
     && luarocks install luasec \
     && luarocks install redis-lua \
     && luarocks install busted \
