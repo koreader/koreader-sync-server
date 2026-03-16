@@ -3,7 +3,7 @@ name: Busted test suite
 on:
   pull_request:
     branches:
-        - "**"
+      - "**"
 
 jobs:
   build-and-test:
@@ -20,16 +20,13 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Build image
-        run: |
-          make build VERSION=test
+        run: make build VERSION=test
 
       - name: Run busted test suite
-        run: |
-          make test VERSION=test
+        run: make test VERSION=test
 
       - name: Verify production healthcheck
         run: |
           docker run -d --name kosync-test app:test
           sleep 5
           docker exec kosync-test /app/koreader-sync-server/scripts/healthcheck.sh
-          docker stop kosync-test
