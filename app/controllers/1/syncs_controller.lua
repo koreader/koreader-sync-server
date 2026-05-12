@@ -50,7 +50,7 @@ function SyncsController:authorize()
         local key, err = redis:get(string.format(self.user_key, auth_user))
         if key and key ~= null then
             if hash_password(auth_key) == key then
-                ngx.log(ngx.INFO, "auth ok: ", auth_user)
+                ngx.log(ngx.DEBUG, "auth ok: ", auth_user)
                 return auth_user
             end
             if auth_key == key then
@@ -160,7 +160,7 @@ function SyncsController:get_progress()
         res.document = doc
     end
 
-    ngx.log(ngx.INFO, "get progress: ", username, " doc=", doc)
+    ngx.log(ngx.DEBUG, "get progress: ", username, " doc=", doc)
     Redis.release()
     return 200, res
 end
@@ -195,7 +195,7 @@ function SyncsController:update_progress()
         if not ok then
             self:raise_error(self.error_internal)
         end
-        ngx.log(ngx.INFO, "sync: ", username, " doc=", doc,
+        ngx.log(ngx.DEBUG, "sync: ", username, " doc=", doc,
                 " pct=", percentage, " dev=", device)
         Redis.release()
         return 200, {

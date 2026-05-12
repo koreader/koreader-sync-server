@@ -442,9 +442,10 @@ local SETTINGS_DEFS = {
     {
         key = "log_lines",
         name = "Log Lines to Display",
-        desc = "Number of log lines shown in the Logs tab.",
+        desc = "Number of log lines shown in the Logs tab (max 1000).",
         type = "number",
         default = "200",
+        max = 1000,
     },
 }
 
@@ -499,7 +500,8 @@ local function render_settings(settings_values, flash_msg)
             w('<input type="checkbox" name="' .. esc(def.key) .. '" value="true"' .. checked .. '>')
             w('<span class="slider"></span></label>')
         elseif def.type == "number" then
-            w('<input type="number" name="' .. esc(def.key) .. '" value="' .. esc(val) .. '" class="input-field" min="1">')
+            local max_attr = def.max and (' max="' .. def.max .. '"') or ""
+            w('<input type="number" name="' .. esc(def.key) .. '" value="' .. esc(val) .. '" class="input-field" min="1"' .. max_attr .. '>')
         end
 
         w('</div>')
@@ -613,6 +615,8 @@ function AdminController:logs()
         if v and v ~= null then max_lines = tonumber(v) or 200 end
         Redis.release()
     end
+    if max_lines > 1000 then max_lines = 1000 end
+    if max_lines < 1 then max_lines = 1 end
 
     local access = tail_file(log_path("access"), max_lines)
     local applog = tail_file(log_path("error"), max_lines)
@@ -735,7 +739,10 @@ function AdminController:save_settings()
         if type(val) == "table" then val = val[#val] end
         if val then
             if def.type == "number" then
-                val = tostring(tonumber(val) or def.default)
+                local n = tonumber(val) or tonumber(def.default)
+                if def.max and n > def.max then n = def.max end
+                if n < 1 then n = 1 end
+                val = tostring(n)
             end
             redis:set("settings:" .. def.key, val)
         end

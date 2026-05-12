@@ -72,6 +72,10 @@ RUN mkdir -p /etc/my_init.d \
     && cp koreader-sync-server/scripts/fix-permissions.sh /etc/my_init.d/fix-permissions.sh \
     && chmod +x /etc/my_init.d/fix-permissions.sh
 
+# daily log rotation via cron (phusion/baseimage enables cron by default)
+RUN echo "0 3 * * * /app/koreader-sync-server/scripts/logrotate.sh > /dev/null 2>&1" \
+    | crontab -
+
 VOLUME ["/var/log/redis", "/var/lib/redis"]
 
 EXPOSE 7200
