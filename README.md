@@ -1,90 +1,219 @@
 [![AGPL Licence][licence-badge]](COPYING)
-Koreader Sync Server
-========
 
-Koreader sync server is built on top of the [Gin](http://gin.io) JSON-API
-framework which runs on [OpenResty](http://openresty.org/) and is entirely
-written in [Lua](http://www.lua.org/).
+# KOReader Sync Server
 
-Users of koreader devices can register their devices to the synchronization
-server and use the sync service to keep all reading progress synchronized
-between devices.
+A self-hosted reading progress sync server for [KOReader](https://koreader.rocks/)
+devices. Built on [OpenResty](https://openresty.org/) (nginx + Lua) with Redis
+for storage.
 
-This project is licenced under Affero GPL v3, see the [COPYING](COPYING) file.
+Register your KOReader devices and keep reading progress synchronised across
+all of them — Kindle, Kobo, PocketBook, Android, desktop, whatever runs
+KOReader.
 
-Setup your own server
-======================
-Using docker, you can spin up your own server in two commands:
+## Features
+
+- **Reading progress sync** — tracks percentage, position, device, and
+  timestamp per document per user
+- **Admin dashboard** — web UI at `/admin` showing all users, documents,
+  progress bars, and last-sync times
+- **Logs viewer** — live access and application logs with color-coded status,
+  auto-refresh toggle
+- **User management** — delete users or reset passwords from the dashboard
+- **Security hardened** — SHA-1 hashed passwords, TLS 1.2/1.3 only, rate
+  limiting, security headers, HttpOnly admin cookie
+- **Docker-ready** — single container with Redis, nginx, and the app; data
+  persisted via volumes
+
+## Quick Start
+
+### Docker run
 
 ```bash
-# for quick test
-docker run -d -p 7200:7200 --name=kosync koreader/kosync:latest
-
-# for production, we mount redis data volume to persist state
 mkdir -p ./logs/{redis,app} ./data/redis
+
+docker build --tag=koreader/kosync .
+
 docker run -d -p 7200:7200 \
-    -v `pwd`/logs/app:/app/koreader-sync-server/logs \
-    -v `pwd`/logs/redis:/var/log/redis \
-    -v `pwd`/data/redis:/var/lib/redis \
-    --name=kosync koreader/kosync:latest
+    -e ADMIN_PASSWORD=your-secret \
+    -v $(pwd)/logs/app:/app/koreader-sync-server/logs \
+    -v $(pwd)/logs/redis:/var/log/redis \
+    -v $(pwd)/data/redis:/var/lib/redis \
+    --name=kosync koreader/kosync
 ```
 
-The above command will spin up a sync server in a docker container.
-
-To build your own docker image from scratch:
-
-```bash
-docker build --rm=true --tag=koreader/kosync .
-```
-
-Alternatively, if you'd rather use docker compose:
+### Docker Compose
 
 ```bash
 docker compose up -d --build
 ```
 
-To setup the server manually, please refer to the commands used in
-the [Dockerfile][dockerfile].
+See `docker-compose.yml` — edit the `ADMIN_PASSWORD` environment variable
+before starting.
 
-You can use the following command to verify that the sync server is ready to serve traffic:
+### Verify it works
 
 ```bash
-curl -k -v -H "Accept: application/vnd.koreader.v1+json" https://localhost:7200/healthcheck
-# should return {"state":"OK"}
+curl -k https://localhost:7200/healthcheck
+# {"state":"OK"}
 ```
 
-As you can see, the server responds over HTTPS using a self-signed certificate. If you'd like to run the server behind a reverse proxy and let the proxy handle TLS termination, run the server on port `17200` instead of `7200`. As an example, your Traefik V3 configuration could look like this:
+The healthcheck now verifies Redis connectivity — if Redis is down it
+returns `503 {"state":"FAIL"}`.
 
-```bash
+## Configuration
+
+| Environment Variable | Default | Description |
+|---|---|---|
+| `ENABLE_USER_REGISTRATION` | `true` | Initial default for new sign-ups. Can be toggled at runtime via the admin Settings tab |
+| `ADMIN_PASSWORD` | *(unset)* | Password for the admin dashboard. **Required** — the dashboard is disabled until this is set |
+
+## Admin Dashboard
+
+Access the dashboard at `https://your-server:7200/admin`.
+
+- **Dashboard tab** — lists all registered users with their synced documents,
+  reading progress bars, device names, and last-sync timestamps. Includes
+  search/filter and user management (delete user, reset password).
+- **Logs tab** — shows the last 200 lines of the nginx access log and
+  application log. Lines are color-coded by HTTP status (2xx/3xx/4xx/5xx) and
+  severity (info/warn/error). Supports auto-refresh (3–60 second interval).
+
+## KOReader Client Setup
+
+On your KOReader device:
+
+1. Go to **Tools → Cloud storage & sync → Progress sync**
+2. Set the server to `https://your-server:7200`
+3. Register a new account or log in with existing credentials
+4. Enable "auto sync" to sync on every page turn
+
+All devices using the same account will share reading positions.
+
+## Running Behind a Reverse Proxy
+
+The server listens on two ports inside the container:
+
+| Port | Protocol |
+|---|---|
+| `7200` | HTTPS (self-signed cert) |
+| `17200` | HTTP (plain, for reverse proxy termination) |
+
+If your reverse proxy handles TLS, point it at port `17200`:
+
+```yaml
+# Traefik v3 example
+services:
   kosync:
     # ...
     labels:
       - traefik.enable=true
-      - 'traefik.http.routers.kosync.rule=Host(`kosync.example.com`)'
+      - 'traefik.http.routers.kosync.rule=Host(`sync.example.com`)'
       - 'traefik.http.services.kosync.loadbalancer.server.port=17200'
 ```
 
-Privacy and security
-========
+## API Endpoints
 
-Koreader sync server does not store file name or file content in the database.
-For each user it uses a unique string of 32 digits (MD5 hash) to identify the
-same document from multiple koreader devices and keeps a record of the furthest
-reading progress for that document. Sample progress data entries stored in the
-sync server are like these:
-```
-"user:chrox:document:0b229176d4e8db7f6d2b5a4952368d7a:percentage"  --> "0.31879884821061"
-"user:chrox:document:0b229176d4e8db7f6d2b5a4952368d7a:progress"    --> "/body/DocFragment[20]/body/p[22]/img.0"
-"user:chrox:document:0b229176d4e8db7f6d2b5a4952368d7a:device"      --> "PocketBook"
-```
-And the account authentication information is stored like this:
-```
-"user:chrox:key"  --> "1c56000eef209217ec0b50354558ab1a"
-```
-the password is MD5 hashed at client when authorizing with the sync server.
+All endpoints are versioned under `/1/` and expect the header
+`Accept: application/vnd.koreader.v1+json`.
 
-In addition, all data transferred between koreader devices and the sync server
-are secured by HTTPS (Hypertext Transfer Protocol Secure) connections.
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| `POST` | `/1/users/create` | — | Register `{username, password}` |
+| `GET` | `/1/users/auth` | `x-auth-user` + `x-auth-key` | Verify credentials |
+| `PUT` | `/1/syncs/progress` | `x-auth-user` + `x-auth-key` | Update reading position |
+| `GET` | `/1/syncs/progress/:document` | `x-auth-user` + `x-auth-key` | Get reading position |
+| `GET` | `/healthcheck` | — | Server + Redis health |
 
-[licence-badge]:http://img.shields.io/badge/licence-AGPL-brightgreen.svg
-[dockerfile]:https://github.com/koreader/koreader-sync-server/blob/master/Dockerfile
+## Privacy & Security
+
+- **No filenames stored** — documents are identified by a 32-character MD5 hash
+  generated client-side by KOReader. The server never sees the actual filename.
+- **Passwords hashed** — stored as salted SHA-1 hashes in Redis. Existing
+  plaintext passwords from older versions are transparently upgraded to hashed
+  on next login.
+- **TLS enforced** — the server uses a self-signed certificate by default.
+  Deploy behind a reverse proxy with a real certificate for production use.
+- **Rate limited** — 10 requests/second per IP with burst allowance of 20.
+- **Security headers** — `X-Frame-Options: DENY`,
+  `X-Content-Type-Options: nosniff`, `Referrer-Policy`.
+- **Admin access** — protected by a separate password with HttpOnly,
+  SameSite=Strict cookies.
+
+## Docker Logging
+
+Nginx access and application logs stream to the container's stdout/stderr, so
+`docker logs -f kosync` shows live traffic. Logs are also written to files in
+the mounted `./logs/app` volume.
+
+## Upgrading from the Original Version
+
+This fork is a drop-in replacement for the upstream
+[koreader/koreader-sync-server](https://github.com/koreader/koreader-sync-server).
+
+**Data is fully compatible** — the Redis schema (key patterns, hash fields) is
+unchanged. Your existing users, documents, and reading positions carry over
+without any migration.
+
+**KOReader devices won't notice** — the sync API is identical. No client-side
+changes needed.
+
+### What to know
+
+- **Passwords are now hashed.** The original stored passwords as plaintext in
+  Redis. This version stores salted SHA-1 hashes. Existing plaintext passwords
+  are **automatically upgraded** to hashed on the user's next login — no manual
+  action required.
+- **Downgrading after upgrade** will lock out any user whose password was
+  already migrated to a hash, since the old code expects plaintext.
+- **`ADMIN_PASSWORD` is required** for the admin dashboard. Set it in your
+  environment or `docker-compose.yml`. The dashboard is disabled without it.
+- **New log volume.** Mount `./logs/app:/app/koreader-sync-server/logs` to
+  persist nginx access and application logs. Optional — logs stay inside the
+  container if not mounted.
+
+### Upgrade steps
+
+```bash
+# Stop the old container
+docker stop kosync && docker rm kosync
+
+# Pull/build the new image
+docker build --tag=koreader/kosync .
+
+# Start with the same Redis data volume and add new config
+docker run -d -p 7200:7200 \
+    -e ADMIN_PASSWORD=your-secret \
+    -v /path/to/existing/redis:/var/lib/redis \
+    -v $(pwd)/logs/app:/app/koreader-sync-server/logs \
+    -v $(pwd)/logs/redis:/var/log/redis \
+    --name=kosync koreader/kosync
+```
+
+Or with Docker Compose, update your `docker-compose.yml` to add the
+`ADMIN_PASSWORD` environment variable and the logs volume, then:
+
+```bash
+docker compose up -d --build
+```
+
+## Development
+
+Run the test suite inside the container:
+
+```bash
+docker exec kosync bash -c "cd /app/koreader-sync-server && make test"
+```
+
+Or build and run tests from scratch:
+
+```bash
+docker build --tag=koreader/kosync .
+docker run --rm koreader/kosync bash -c \
+    "cd /app/koreader-sync-server && scripts/run_tests.sh"
+```
+
+## License
+
+AGPL v3 — see [COPYING](COPYING).
+
+[licence-badge]: http://img.shields.io/badge/licence-AGPL-brightgreen.svg

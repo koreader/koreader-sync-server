@@ -1,12 +1,17 @@
 FROM phusion/baseimage:jammy-1.0.4
 
-# install system dependencies
+# install system dependencies + Redis 7.x from official repo
 RUN apt-get update \
     && apt-get install --no-install-recommends -y \
         libreadline-dev libncurses5-dev libpcre3-dev libssl-dev \
         build-essential git openssl \
-        luarocks unzip redis-server \
-        zlib1g-dev \
+        luarocks unzip \
+        zlib1g-dev curl gpg lsb-release \
+    && curl -fsSL https://packages.redis.io/gpg | gpg --dearmor -o /usr/share/keyrings/redis-archive-keyring.gpg \
+    && echo "deb [signed-by=/usr/share/keyrings/redis-archive-keyring.gpg] https://packages.redis.io/deb $(lsb_release -cs) main" \
+        > /etc/apt/sources.list.d/redis.list \
+    && apt-get update \
+    && apt-get install --no-install-recommends -y redis-server \
     && apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 ARG OPENRESTY_VER=1.27.1.2
@@ -61,6 +66,11 @@ RUN mkdir /etc/service/koreader-sync-server \
 
 # add app source code last so app changes don't invalidate dependency layers
 COPY ./ koreader-sync-server
+
+# fix volume permissions at startup (runs before services)
+RUN mkdir -p /etc/my_init.d \
+    && cp koreader-sync-server/scripts/fix-permissions.sh /etc/my_init.d/fix-permissions.sh \
+    && chmod +x /etc/my_init.d/fix-permissions.sh
 
 VOLUME ["/var/log/redis", "/var/lib/redis"]
 

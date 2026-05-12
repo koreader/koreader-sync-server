@@ -1,13 +1,14 @@
 services:
   kosync:
-    image: koreader/kosync:latest
+    build: .
     container_name: kosync
+    restart: unless-stopped
     ports:
       - 7200:7200
     environment:
       - ENABLE_USER_REGISTRATION=true
+      - ADMIN_PASSWORD=change-me
     volumes:
-      - ./logs/app:/app/koreader-sync-server/logs
-      - ./logs/redis:/var/log/redis
-      - ./data/redis:/var/lib/redis
-
+      - /mnt/cache/appdata/koreader-sync-server/test/logs/app:/app/koreader-sync-server/logs
+      - /mnt/cache/appdata/koreader-sync-server/test/logs/redis:/var/log/redis
+      - /mnt/cache/appdata/koreader-sync-server/test/data/redis:/var/lib/redis
