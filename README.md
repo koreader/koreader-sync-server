@@ -74,9 +74,12 @@ Access the dashboard at `https://your-server:7200/admin`.
 - **Dashboard tab** — lists all registered users with their synced documents,
   reading progress bars, device names, and last-sync timestamps. Includes
   search/filter and user management (delete user, reset password).
-- **Logs tab** — shows the last 200 lines of the nginx access log and
-  application log. Lines are color-coded by HTTP status (2xx/3xx/4xx/5xx) and
-  severity (info/warn/error). Supports auto-refresh (3–60 second interval).
+- **Logs tab** — shows the nginx access log and application log. Lines are
+  color-coded by HTTP status (2xx/3xx/4xx/5xx) and severity
+  (info/warn/error). Supports auto-refresh (3–60 second interval).
+- **Settings tab** — toggle user registration on/off at runtime, configure
+  the number of log lines displayed, and other server settings. Changes are
+  stored in Redis and persist across restarts.
 
 ## KOReader Client Setup
 
@@ -113,15 +116,15 @@ services:
 
 ## API Endpoints
 
-All endpoints are versioned under `/1/` and expect the header
-`Accept: application/vnd.koreader.v1+json`.
+All endpoints require the header `Accept: application/vnd.koreader.v1+json`
+(version is in the Accept header, not the URL path).
 
 | Method | Path | Auth | Description |
 |---|---|---|---|
-| `POST` | `/1/users/create` | — | Register `{username, password}` |
-| `GET` | `/1/users/auth` | `x-auth-user` + `x-auth-key` | Verify credentials |
-| `PUT` | `/1/syncs/progress` | `x-auth-user` + `x-auth-key` | Update reading position |
-| `GET` | `/1/syncs/progress/:document` | `x-auth-user` + `x-auth-key` | Get reading position |
+| `POST` | `/users/create` | — | Register `{username, password}` |
+| `GET` | `/users/auth` | `x-auth-user` + `x-auth-key` | Verify credentials |
+| `PUT` | `/syncs/progress` | `x-auth-user` + `x-auth-key` | Update reading position |
+| `GET` | `/syncs/progress/:document` | `x-auth-user` + `x-auth-key` | Get reading position |
 | `GET` | `/healthcheck` | — | Server + Redis health |
 
 ## Privacy & Security
