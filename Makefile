@@ -10,9 +10,9 @@ start: build
 	mkdir -p logs/app logs/redis data/redis
 	-docker rm -f $(CONTAINER_NAME)
 	docker run -d -p $(HOST_PORT):7200 \
-		-v `pwd`/logs/app:/app/koreader-sync-server/logs \
-		-v `pwd`/logs/redis:/var/log/redis \
-		-v `pwd`/data/redis:/var/lib/redis \
+		-v $$(pwd)/logs/app:/app/koreader-sync-server/logs \
+		-v $$(pwd)/logs/redis:/var/log/redis \
+		-v $$(pwd)/data/redis:/var/lib/redis \
 		--name=$(CONTAINER_NAME) koreader/kosync:$(VERSION)
 
 stop:
