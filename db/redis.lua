@@ -5,7 +5,7 @@ local DbSettings = {
     development = {
         host = "127.0.0.1",
         port = 6379,
-        database = 1,
+        database = 3,
         pool = 5
     },
 
@@ -19,7 +19,7 @@ local DbSettings = {
     production = {
         host = "127.0.0.1",
         port = 6379,
-        database = 3,
+        database = 1,
         pool = 5
     }
 }
