@@ -3,7 +3,7 @@ FROM debian:trixie-slim
 # install system dependencies
 RUN apt-get update \
     && apt-get install --no-install-recommends -y \
-        ca-certificates wget curl \
+        ca-certificates curl \
         libreadline-dev libncurses5-dev libpcre2-dev libssl-dev \
         build-essential git openssl \
         luarocks unzip redis-server \
@@ -15,7 +15,7 @@ ARG OPENRESTY_VER=1.29.2.3
 ENV PATH=/opt/openresty/nginx/sbin:$PATH
 
 WORKDIR /app
-RUN wget "https://openresty.org/download/openresty-${OPENRESTY_VER}.tar.gz" \
+RUN curl -fL "https://openresty.org/download/openresty-${OPENRESTY_VER}.tar.gz" -o openresty-${OPENRESTY_VER}.tar.gz \
         && tar zxvf openresty-${OPENRESTY_VER}.tar.gz \
         && cd openresty-${OPENRESTY_VER} \
             && ./configure --prefix=/opt/openresty \
