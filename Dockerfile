@@ -46,21 +46,23 @@ RUN luarocks remove --force luasocket 3.0rc1-2 \
 
 # create daemons
 RUN mkdir /etc/service/redis-server \
-    && echo -n "#!/bin/sh\nexec redis-server /app/koreader-sync-server/config/redis.conf" > \
+    && printf '#!/bin/sh\nexec redis-server /app/koreader-sync-server/config/redis.conf\n' > \
         /etc/service/redis-server/run \
     && chmod +x /etc/service/redis-server/run
 
 ENV ENABLE_USER_REGISTRATION=true
 ENV GIN_ENV=production
 
+# add app source code after so app changes don't invalidate dependency layers
+# but before starting the app
+COPY ./ koreader-sync-server
+
 # append 'daemon off;' at runtime so tests can still use the config normally
+# grep from start of line only; nginx.conf has daemon off commented out by default
 RUN mkdir /etc/service/koreader-sync-server \
-    && echo -n "#!/bin/sh\ngrep -q 'daemon off;' /app/koreader-sync-server/config/nginx.conf || echo 'daemon off;' >> /app/koreader-sync-server/config/nginx.conf\ncd /app/koreader-sync-server\nexec gin start" > \
+    && printf "#!/bin/sh\ngrep -q '^daemon off;' /app/koreader-sync-server/config/nginx.conf || echo 'daemon off;' >> /app/koreader-sync-server/config/nginx.conf\ncd /app/koreader-sync-server\nexec gin start" > \
         /etc/service/koreader-sync-server/run \
     && chmod +x /etc/service/koreader-sync-server/run
-
-# add app source code last so app changes don't invalidate dependency layers
-COPY ./ koreader-sync-server
 
 VOLUME ["/var/log/redis", "/var/lib/redis"]
 
