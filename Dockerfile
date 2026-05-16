@@ -1,19 +1,21 @@
-FROM phusion/baseimage:jammy-1.0.4
+FROM debian:trixie-slim
 
 # install system dependencies
 RUN apt-get update \
     && apt-get install --no-install-recommends -y \
-        libreadline-dev libncurses5-dev libpcre3-dev libssl-dev \
+        ca-certificates curl \
+        libreadline-dev libncurses5-dev libpcre2-dev libssl-dev \
         build-essential git openssl \
         luarocks unzip redis-server \
         zlib1g-dev \
+        runit \
     && apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
-ARG OPENRESTY_VER=1.27.1.2
+ARG OPENRESTY_VER=1.29.2.3
 ENV PATH=/opt/openresty/nginx/sbin:$PATH
 
 WORKDIR /app
-RUN wget "https://openresty.org/download/openresty-${OPENRESTY_VER}.tar.gz" \
+RUN curl -fL "https://openresty.org/download/openresty-${OPENRESTY_VER}.tar.gz" -o openresty-${OPENRESTY_VER}.tar.gz \
         && tar zxvf openresty-${OPENRESTY_VER}.tar.gz \
         && cd openresty-${OPENRESTY_VER} \
             && ./configure --prefix=/opt/openresty \
@@ -71,4 +73,4 @@ EXPOSE 7200
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
     CMD /app/koreader-sync-server/scripts/healthcheck.sh
 
-CMD ["/sbin/my_init"]
+CMD ["/usr/bin/runsvdir", "-P", "/etc/service"]
