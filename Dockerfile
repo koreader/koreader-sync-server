@@ -8,7 +8,7 @@ RUN apt-get update \
         build-essential git openssl \
         luarocks unzip redis-server \
         zlib1g-dev \
-        runit tini \
+        runit \
     && apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 ARG OPENRESTY_VER=1.29.2.3
@@ -73,5 +73,4 @@ EXPOSE 7200
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
     CMD /app/koreader-sync-server/scripts/healthcheck.sh
 
-ENTRYPOINT ["/usr/bin/tini", "--"]
 CMD ["/usr/bin/runsvdir", "-P", "/etc/service"]
