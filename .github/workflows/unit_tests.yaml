@@ -18,12 +18,17 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
 
+      # Add support for more platforms on release builds.
+      - name: Set up QEMU
+        if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'release'
+        uses: docker/setup-qemu-action@v4
+
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       - name: Extract GHCR metadata
         id: ghcr_meta
-        if: github.event_name == 'push' && github.repository == 'koreader/koreader-sync-server'
+        if: (github.event_name == 'push' || github.event_name == 'release') && github.repository == 'koreader/koreader-sync-server'
         uses: docker/metadata-action@v5
         with:
           images: ghcr.io/${{ github.repository_owner }}/kosync
@@ -31,6 +36,7 @@ jobs:
             type=raw,value=latest,enable={{is_default_branch}}
             type=ref,event=tag
             type=sha,prefix=sha-
+            type=raw,value=${{ github.event.release.tag_name }},enable=${{ github.event_name == 'release' }}
 
       - name: Extract Docker Hub metadata
         id: dockerhub_meta
@@ -66,7 +72,7 @@ jobs:
           docker exec kosync-test /app/koreader-sync-server/scripts/healthcheck.sh
 
       - name: Log in to GitHub Container Registry
-        if: github.event_name == 'push' && github.repository == 'koreader/koreader-sync-server'
+        if: (github.event_name == 'push' || github.event_name == 'release') && github.repository == 'koreader/koreader-sync-server'
         uses: docker/login-action@v4
         with:
           registry: ghcr.io
@@ -74,7 +80,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Push GHCR image
-        if: github.event_name == 'push' && github.repository == 'koreader/koreader-sync-server'
+        if: github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/') && github.repository == 'koreader/koreader-sync-server'
         run: |
           while IFS= read -r tag; do
             docker tag koreader/kosync:test "$tag"
@@ -90,12 +96,16 @@ jobs:
           username: frenzie
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Push Docker Hub image
+      - name: Build and push multi-platform release images
         if: (startsWith(github.ref, 'refs/tags/') || github.event_name == 'release') && github.repository == 'koreader/koreader-sync-server'
-        run: |
-          while IFS= read -r tag; do
-            docker tag koreader/kosync:test "$tag"
-            docker push "$tag"
-          done <<'EOF'
-          ${{ steps.dockerhub_meta.outputs.tags }}
-          EOF
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          platforms: linux/amd64,linux/arm64
+          labels: ${{ steps.ghcr_meta.outputs.labels || steps.dockerhub_meta.outputs.labels }}
+          tags: |
+            ${{ steps.ghcr_meta.outputs.tags }}
+            ${{ steps.dockerhub_meta.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
