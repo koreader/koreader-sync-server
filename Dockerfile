@@ -3,7 +3,7 @@ FROM debian:trixie-slim
 # install system dependencies
 RUN apt-get update \
     && apt-get install --no-install-recommends -y \
-        ca-certificates wget \
+        ca-certificates wget curl \
         libreadline-dev libncurses5-dev libpcre2-dev libssl-dev \
         build-essential git openssl \
         luarocks unzip redis-server \
