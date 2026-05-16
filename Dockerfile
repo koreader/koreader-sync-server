@@ -73,5 +73,5 @@ EXPOSE 7200
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
     CMD /app/koreader-sync-server/scripts/healthcheck.sh
 
- ENTRYPOINT ["/usr/bin/tini", "--"]
- CMD ["/usr/bin/runsvdir", "-P", "/etc/service"]
+ENTRYPOINT ["/usr/bin/tini", "--"]
+CMD ["/usr/bin/runsvdir", "-P", "/etc/service"]
