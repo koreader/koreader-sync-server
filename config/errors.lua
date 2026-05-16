@@ -13,7 +13,7 @@
 -------------------------------------------------------------------------------------------------------------------
 
 local Errors = {
-    [1000] = { status = 502, message = "Cannot connect to service.", },
+    [1000] = { status = 502, message = "Cannot connect to redis server.", },
     [2000] = { status = 502, message = "Unknown server error.", },
     [2001] = { status = 401, message = "Unauthorized", },
     [2002] = { status = 402, message = "Username is already registered.", },
