@@ -56,6 +56,21 @@ describe("SyncsController", function()
         return response
     end
 
+    local function update_password(username, userkey, password)
+        local response = hit({
+            scheme = "https",
+            method = "PUT",
+            path = "/users/password",
+            headers = {
+                ["x-auth-user"] = username,
+                ["x-auth-key"] = userkey,
+            },
+            body = { password = password },
+        })
+
+        return response
+    end
+
     local function get(username, userkey, document)
         local response = hit({
             scheme = "https",
@@ -70,7 +85,7 @@ describe("SyncsController", function()
         return response
     end
 
-    local function update(username, userkey, document, percentage, progress, device)
+    local function update(username, userkey, document, percentage, progress, device, device_id)
         local response = hit({
             scheme = "https",
             method = "PUT",
@@ -84,6 +99,7 @@ describe("SyncsController", function()
                 progress = progress,
                 percentage = percentage,
                 device = device,
+                device_id = device_id,
             }
         })
 
@@ -226,6 +242,143 @@ describe("SyncsController", function()
             redis = client()
             assert.are.same({ "wrong-type" }, redis:lrange("user:broken:key", 0, -1))
             redis:quit()
+        end)
+    end)
+
+    describe("#password", function()
+        local function redis_client()
+            local redis = require("redis")
+            local client = redis.connect("127.0.0.1", 6379)
+            client:select(2)
+            return client
+        end
+
+        local function assert_unauthorized(response)
+            assert.are.same(401, response.status)
+            assert.are.same({code = 2001, message = "Unauthorized"}, response.body)
+        end
+
+        it("replaces the authentication key without changing the username", function()
+            assert.are.same(201, register("reader", "old-key").status)
+            local response = update_password("reader", "old-key", "new-key")
+            assert.are.same(200, response.status)
+            assert.are.same({ updated = true }, response.body)
+            assert_unauthorized(authorize("reader", "old-key"))
+            assert.are.same(200, authorize("reader", "new-key").status)
+        end)
+
+        it("rejects missing, empty, invalid and incorrect authentication", function()
+            register("reader", "old-key")
+            assert_unauthorized(update_password(nil, "old-key", "new-key"))
+            assert_unauthorized(update_password("", "old-key", "new-key"))
+            assert_unauthorized(update_password("reader:other", "old-key", "new-key"))
+            assert_unauthorized(update_password("reader", nil, "new-key"))
+            assert_unauthorized(update_password("reader", "", "new-key"))
+            assert_unauthorized(update_password("reader", "wrong-key", "new-key"))
+            assert.are.same(200, authorize("reader", "old-key").status)
+            assert_unauthorized(authorize("reader", "new-key"))
+        end)
+
+        it("never creates a nonexistent account", function()
+            assert_unauthorized(update_password("missing", "old-key", "new-key"))
+            local client = redis_client()
+            assert.is_nil(client:get("user:missing:key"))
+            client:quit()
+        end)
+
+        it("rejects missing and invalid replacement keys without changing the account", function()
+            register("reader", "old-key")
+            local responses = {
+                update_password("reader", "old-key", nil),
+                update_password("reader", "old-key", ""),
+                update_password("reader", "old-key", 123),
+                update_password("reader", "old-key", false),
+                update_password("reader", "old-key", {}),
+            }
+            for _, response in ipairs(responses) do
+                assert.are.same(403, response.status)
+                assert.are.same({ code = 2003, message = "Invalid request" }, response.body)
+            end
+            assert.are.same(200, authorize("reader", "old-key").status)
+        end)
+
+        it("rejects stale retries and allows confirmation using the replacement key", function()
+            register("reader", "old-key")
+            assert.are.same(200, update_password("reader", "old-key", "new-key").status)
+            assert_unauthorized(update_password("reader", "old-key", "new-key"))
+            assert_unauthorized(update_password("reader", "old-key", "different-key"))
+            assert.are.same(200, authorize("reader", "new-key").status)
+            assert_unauthorized(authorize("reader", "different-key"))
+            assert.are.same(200, update_password("reader", "new-key", "next-key").status)
+            assert_unauthorized(authorize("reader", "new-key"))
+            assert.are.same(200, authorize("reader", "next-key").status)
+        end)
+
+        it("allows an authenticated request to retain its current key", function()
+            register("reader", "same-key")
+            assert.are.same(200, update_password("reader", "same-key", "same-key").status)
+            assert.are.same(200, authorize("reader", "same-key").status)
+        end)
+
+        it("preserves every progress field and other accounts", function()
+            register("reader", "old-key")
+            register("reader-other", "other-key")
+            local documents = { "document1", "document2" }
+            local saved = {}
+            for _, document in ipairs(documents) do
+                assert.are.same(200, update("reader", "old-key", document,
+                    0.32, "56", "reader device", "device1").status)
+                saved[document] = get("reader", "old-key", document).body
+            end
+            local client = redis_client()
+            client:set("user:reader:metadata", "unchanged")
+            client:quit()
+            assert.are.same(200, update_password("reader", "old-key", "new-key").status)
+            for _, document in ipairs(documents) do
+                local response = get("reader", "new-key", document)
+                assert.are.same(200, response.status)
+                assert.are.same(saved[document], response.body)
+                assert_unauthorized(get("reader", "old-key", document))
+            end
+            assert_unauthorized(update("reader", "old-key", documents[1],
+                0.99, "99", "old device"))
+            assert.are.same(200, update("reader", "new-key", documents[1],
+                0.4, "60", "new device").status)
+            assert.are.same("60", get("reader", "new-key", documents[1]).body.progress)
+            assert.are.same(200, authorize("reader-other", "other-key").status)
+            client = redis_client()
+            assert.are.same("unchanged", client:get("user:reader:metadata"))
+            client:quit()
+        end)
+
+        it("does not use a body username to target a different account", function()
+            register("reader", "old-key")
+            register("other", "other-key")
+            local response = hit({
+                scheme = "https",
+                method = "PUT",
+                path = "/users/password",
+                headers = {
+                    ["x-auth-user"] = "reader",
+                    ["x-auth-key"] = "old-key",
+                },
+                body = { username = "other", password = "new-key" },
+            })
+            assert.are.same(200, response.status)
+            assert.are.same(200, authorize("reader", "new-key").status)
+            assert.are.same(200, authorize("other", "other-key").status)
+        end)
+
+        it("returns a generic server error on Redis failure without replacing the key", function()
+            local client = redis_client()
+            client:lpush("user:reader:key", "wrong-type")
+            client:quit()
+            local response = update_password("reader", "old-key", "new-key")
+            assert.are.same(502, response.status)
+            assert.are.same({ code = 2000, message = "Unknown server error." }, response.body)
+            client = redis_client()
+            assert.are.same({ "wrong-type" }, client:lrange("user:reader:key", 0, -1))
+            client:quit()
         end)
     end)
 

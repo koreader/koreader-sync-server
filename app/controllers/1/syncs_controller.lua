@@ -61,6 +61,16 @@ redis.call("HSET", KEYS[2], unpack(ARGV, 2))
 return 1
 ]]
 
+-- Authenticate and update in one operation so concurrent changes using the
+-- same current key cannot both succeed. Document keys are never touched.
+local update_password_script = [[
+if redis.call("GET", KEYS[1]) ~= ARGV[1] then
+    return 0
+end
+redis.call("SET", KEYS[1], ARGV[2])
+return 1
+]]
+
 -- Whether a field is valid, i.e. not an empty string.
 local function is_valid_field(field)
     return type(field) == "string" and string.len(field) > 0
@@ -141,6 +151,30 @@ function SyncsController:delete_user()
     end
 
     return 200, { deleted = true }
+end
+
+function SyncsController:update_password()
+    local username = self.request.headers['x-auth-user']
+    local current_key = self.request.headers['x-auth-key']
+    if not is_valid_key_field(username) or not is_valid_field(current_key) then
+        self:raise_error(self.error_unauthorized_user)
+    end
+
+    local body = self.request.body
+    if type(body) ~= "table" or not is_valid_field(body.password) then
+        self:raise_error(self.error_invalid_fields)
+    end
+
+    local redis = self:getRedis()
+    local updated, err = redis:eval(update_password_script, 1,
+        string.format(self.user_key, username), current_key, body.password)
+    if updated == 0 then
+        self:raise_error(self.error_unauthorized_user)
+    elseif updated ~= 1 then
+        self:raise_error(self.error_internal)
+    end
+
+    return 200, { updated = true }
 end
 
 function SyncsController:get_progress()

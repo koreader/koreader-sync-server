@@ -79,6 +79,21 @@ No deletion records are retained. Usernames can be registered again immediately
 with empty progress. Use a different password when re-registering: a stale deletion
 request cannot be distinguished from a new one if both credentials are reused.
 
+Changing a password
+===================
+
+`PUT /users/password` uses the current `x-auth-user` and `x-auth-key` headers and a
+JSON body of `{"password":"<replacement key>"}`. As with registration, supply a
+nonempty client-derived key (KOReader uses the password's MD5 hash).
+
+Success returns HTTP 200 with `{"updated":true}` and preserves reading progress.
+Update the saved password on all connected readers. This requires the current key;
+it does not provide forgotten-password recovery.
+
+Incorrect credentials and stale retries return HTTP 401. If a response is lost,
+confirm the replacement key with `GET /users/auth`. Invalid replacement values
+return HTTP 403 (code 2003).
+
 Privacy and security
 ========
 
