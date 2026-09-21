@@ -104,6 +104,66 @@ Incorrect credentials and stale retries return HTTP 401. If a response is lost,
 confirm the replacement key with `GET /users/auth`. Invalid replacement values
 return HTTP 403 (code 2003).
 
+Matching a document across copies (API v2)
+=========================================
+
+The API version is chosen by the `Accept` header. `application/vnd.koreader.v1+json`
+is unchanged and is what every released KOReader sends.
+`application/vnd.koreader.v2+json` serves the same endpoints, and additionally lets
+a client offer more than one identifier for a document so that a renamed,
+recompressed or repackaged copy can still find its reading position.
+
+A client sends its identifiers in its own order of preference. Each is an opaque
+`{ "type": ..., "value": ... }` pair; the server never interprets a type, so the set
+of usable identifiers can grow without any server change. The first entry must be
+the `document`, i.e. the identifier the client would send if the server took only one.
+
+```bash
+curl -k -X PUT https://localhost:7200/syncs/progress \
+    -H "Accept: application/vnd.koreader.v2+json" \
+    -H "x-auth-user: user" -H "x-auth-key: <md5>" \
+    -d '{"document":"<content digest>",
+         "identifiers":[{"type":"content","value":"<content digest>"},
+                        {"type":"structure","value":"<structure digest>"},
+                        {"type":"metadata","value":"<metadata digest>"}],
+         "percentage":0.42,"progress":"/body/DocFragment[20]/body/p[22]",
+         "device":"my kpw"}'
+```
+
+On a read the same list is flattened into one `ids` query parameter, because a GET
+has no body and the order matters:
+
+```bash
+curl -k -H "Accept: application/vnd.koreader.v2+json" \
+    -H "x-auth-user: user" -H "x-auth-key: <md5>" \
+    "https://localhost:7200/syncs/progress/<content digest>?ids=content:<d>,structure:<d>,metadata:<d>"
+```
+
+The response carries the version 1 fields plus two more:
+
+* `match` — the identifier type that resolved the lookup, or `exact` when the
+  request named no types and the digest it asked for is the one the record is
+  stored under. `document` is the digest the record is stored under, which is not
+  necessarily the one that was asked for.
+* `progress_match` — the strongest identifier the reader has in common with the
+  client that wrote the current `progress` string, in the reader's own order.
+  `none` when they share nothing.
+
+These are different questions and the second is the one that decides whether an
+xpointer can be followed. A reader can match a record on its own content digest and
+still be handed a position written by a different edition that reached the same
+record through a weaker identifier; in that case `match` is `content` and
+`progress_match` is `metadata`. The server does not act on either: it reports how
+the match was made and the client decides whether to restore the position or to
+seek by percentage.
+
+Matching is per account. Identifiers other than the one a record is stored under
+become aliases, `user:{user}:alias:{digest}` → `{type}:{canonical digest}`. An
+alias is only ever created, never repointed, and never shadows a document that
+exists in its own right, so a weak identifier can fail to match but cannot move a
+reading position onto the wrong record. Deleting an account removes its aliases
+with the rest of its data. At most 8 identifiers are accepted per request.
+
 Privacy and security
 ========
 
@@ -122,6 +182,12 @@ And the account authentication information is stored like this:
 "user:chrox:key"  --> "1c56000eef209217ec0b50354558ab1a"
 ```
 the password is MD5 hashed at client when authorizing with the sync server.
+
+The v2 identifiers keep this property. They are digests computed on the device and
+the server stores them exactly as it stores the document digest: it never receives
+a title, an author or a filename, and it cannot tell a content digest from a
+metadata digest, because the type is a label it stores and echoes without
+interpreting.
 
 In addition, all data transferred between koreader devices and the sync server
 are secured by HTTPS (Hypertext Transfer Protocol Secure) connections.

@@ -424,6 +424,28 @@ describe("SyncsController", function()
                 device = "my kpw"
             }, response.body)
         end)
+        it("is unaffected by the fields version 2 stores beside progress", function()
+            update(username, userkey, doc, 0.32, "56", "my kpw")
+            local redis = require("redis").connect("127.0.0.1", 6379)
+            redis:select(2)
+            redis:hset("user:" .. username .. ":document:" .. doc, "identifiers", "content:" .. doc)
+            redis:hset("user:" .. username .. ":document:" .. doc, "identifiers_for", "56")
+            redis:set("user:" .. username .. ":alias:aliased", "metadata:" .. doc)
+            redis:quit()
+
+            local response = get(username, userkey, doc)
+            assert.are.same(200, response.status)
+            response.body.timestamp = nil
+            assert.are.same({
+                document = doc,
+                percentage = 0.32,
+                progress = "56",
+                device = "my kpw"
+            }, response.body)
+
+            -- Version 1 matches on the document it was given and nothing else.
+            assert.are.same({}, get(username, userkey, "aliased").body)
+        end)
         it("should get the latest document progress", function()
             update(username, userkey, doc, 0.32, "56", "my kpw")
             -- 36 is writting later, so we should get it.
