@@ -12,6 +12,16 @@ between devices.
 
 This project is licenced under Affero GPL v3, see the [COPYING](COPYING) file.
 
+The protocol
+------------
+
+The API is described in the third-party [kosync-conformance](https://github.com/pid1/kosync-conformance),
+together with a verifier that checks an implementation against it in one command.
+The description is observational rather than normative: it documents what this
+server does, and it notes where implementations in the wild disagree. The spec
+text is CC0, so anything in it may be copied here or anywhere else without
+attribution.
+
 Setup your own server
 ======================
 Using docker, you can spin up your own server in two commands:
