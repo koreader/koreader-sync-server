@@ -18,6 +18,7 @@ local SyncsController = {
     error_document_field_missing = 2004,
     error_user_registration_disabled = 2005,
     error_account_not_found = 2006,
+    error_document_not_servable = 2007,
 }
 
 local null = ngx.null
@@ -79,6 +80,14 @@ end
 -- Whether a field is valid as a redis key, i.e. not an empty string and contains no colon.
 local function is_valid_key_field(field)
     return is_valid_field(field) and not string.find(field, ":")
+end
+
+-- The read route binds :document against a fixed character class (see
+-- gin/core/routes.lua, build_named_parameters), so an id outside it is stored
+-- by PUT and then 404s at nginx before the controller is reached. Refuse it on
+-- the way in rather than accepting a write that can never be read back.
+local function is_servable_document(field)
+    return string.match(field, "^[A-Za-z0-9_]+$") ~= nil
 end
 
 function SyncsController:getRedis()
@@ -237,6 +246,9 @@ function SyncsController:update_progress()
     local doc = self.request.body.document
     if not is_valid_key_field(doc) then
         self:raise_error(self.error_document_field_missing)
+    end
+    if not is_servable_document(doc) then
+        self:raise_error(self.error_document_not_servable)
     end
 
     local percentage = tonumber(self.request.body.percentage)

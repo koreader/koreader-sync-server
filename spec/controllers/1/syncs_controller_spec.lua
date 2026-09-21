@@ -440,5 +440,24 @@ describe("SyncsController", function()
                 device = "my pb"
             }, response.body)
         end)
+
+        it("refuses a document id the read route cannot serve", function()
+            for _, bad in ipairs({ "has-a-hyphen", "has.a.dot", "has a space" }) do
+                local response = update(username, userkey, bad, 0.5, "10", "kpw")
+                assert.are.same(403, response.status)
+                assert.are.same(2007, response.body.code)
+                -- and the read route still cannot serve it, which is the point.
+                -- nginx answers 404 for a hyphen or a dot and 400 for a space,
+                -- so assert only that it is never served.
+                assert.is_true(get(username, userkey, bad).status ~= 200)
+            end
+        end)
+
+        it("still accepts the ids real clients send", function()
+            for _, ok in ipairs({ "0b229176d4e8db7f6d2b5a4952368d7a", "under_score", "MiXeD123" }) do
+                local response = update(username, userkey, ok, 0.5, "10", "kpw")
+                assert.are.same(200, response.status)
+            end
+        end)
     end)
 end)
