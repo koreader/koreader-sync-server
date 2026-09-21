@@ -348,4 +348,25 @@ describe("SyncsController v2", function()
             assert.are.same(403, update("reader", "key", "C1", original, nil, xpointer, "d").status)
         end)
     end)
+    describe("#unservable document ids", function()
+        local username, userkey = "user1", "passwd123"
+        before_each(function()
+            register(username, userkey)
+        end)
+
+        it("refuses a document the read route cannot serve, as version 1 does", function()
+            local response = update(username, userkey, "has-a-hyphen",
+                { { type = "content", value = "has-a-hyphen" } }, 0.5, "10", "kpw")
+            assert.are.same(403, response.status)
+            assert.are.same(2007, response.body.code)
+        end)
+
+        it("still accepts a digest", function()
+            local doc = "0b229176d4e8db7f6d2b5a4952368d7a"
+            local response = update(username, userkey, doc,
+                { { type = "content", value = doc } }, 0.5, "10", "kpw")
+            assert.are.same(200, response.status)
+        end)
+    end)
+
 end)

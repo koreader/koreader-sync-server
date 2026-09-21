@@ -40,6 +40,13 @@ local function is_valid_key_field(field)
     return is_valid_field(field) and not string.find(field, ":")
 end
 
+-- Mirrors version 1's guard, kept file-local the way is_valid_key_field above
+-- already is. A record is always keyed by the first identifier, which has to
+-- equal the document, so guarding the document guards the identifiers with it.
+local function is_servable_document(field)
+    return string.match(field, "^[A-Za-z0-9_]+$") ~= nil
+end
+
 -- Walk the caller's identifiers in the caller's own order, trying each as a
 -- document of its own before following it through the alias table. Precedence
 -- is the client's: it decides which of its identifiers is worth trusting
@@ -269,6 +276,9 @@ function SyncsController:update_progress()
     local doc = body.document
     if not is_valid_key_field(doc) then
         self:raise_error(self.error_document_field_missing)
+    end
+    if not is_servable_document(doc) then
+        self:raise_error(self.error_document_not_servable)
     end
 
     local identifiers, reason = self:readIdentifiers(body.identifiers, doc,
