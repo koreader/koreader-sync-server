@@ -21,6 +21,7 @@ local Errors = {
     [2004] = { status = 403, message = "Field 'document' not provided.", },
     [2005] = { status = 402, message = "User registration is disabled.", },
     [2006] = { status = 404, message = "Account not found.", },
+    [2007] = { status = 403, message = "Field 'document' contains characters the read route cannot serve.", },
 }
 
 return Errors
