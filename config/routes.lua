@@ -2,9 +2,8 @@ local routes = require 'gin.core.routes'
 
 -- define versions
 local v1 = routes.version(1)
--- Version 2 answers the same endpoints as version 1. The progress endpoints
--- additionally accept a list of document identifiers and report how a document
--- was matched; everything else is the version 1 behaviour, unchanged.
+-- Same endpoints as version 1; the progress ones also take an identifier list
+-- and report how the document matched.
 local v2 = routes.version(2)
 
 -- define routes

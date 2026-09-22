@@ -44,8 +44,7 @@ describe("SyncsController v2", function()
         })
     end
 
-    -- `ids` is the ordered identifier list, flattened, as a v2 client would
-    -- send it on a read: "type:digest,type:digest".
+    -- ids is "type:digest,type:digest", as a client sends it on a read.
     local function get(username, userkey, document, ids)
         return hit({
             scheme = "https",
@@ -79,9 +78,8 @@ describe("SyncsController v2", function()
         })
     end
 
-    -- Three copies of one work. `edition` shares only its metadata with
-    -- `original`; `repack` is the same edition recompressed, so its content
-    -- digest moves but the structure the xpointer addresses does not.
+    -- Three copies of one work: repack is original recompressed, edition
+    -- shares only the metadata.
     local original = {
         { type = "content", value = "C1" },
         { type = "structure", value = "S1" },
@@ -194,13 +192,11 @@ describe("SyncsController v2", function()
         it("never shadows a document that exists in its own right", function()
             update("reader", "key", "C1", original, 0.32, xpointer, "my kpw")
             update("reader", "key", "C2", { { type = "content", value = "C2" } }, 0.1, "/body/p[2]", "pb")
-            -- C2 was known separately first, so resolving it must still reach
-            -- its own record rather than the one it could alias to.
+            -- C2 was known separately first, so it keeps its own record.
             update("reader", "key", "C2", repack, 0.5, "/body/p[3]", "pb")
             local response = get("reader", "key", "C2", "content:C2")
             assert.are.same("C2", response.body.document)
             assert.are.same("/body/p[3]", response.body.progress)
-            -- and the record it could have aliased to is untouched
             assert.are.same(xpointer, get("reader", "key", "C1", "content:C1").body.progress)
         end)
     end)
@@ -210,10 +206,6 @@ describe("SyncsController v2", function()
             register("reader", "key")
         end)
 
-        -- The reservation this whole feature has to answer: a reader can match
-        -- a record on its own content digest and still be handed an xpointer
-        -- that was written by a different edition. How the document was found
-        -- does not answer that; what the reader shares with the writer does.
         it("separates how the document was found from who wrote the progress", function()
             update("reader", "key", "C1", original, 0.32, xpointer, "my kpw")
             update("reader", "key", "C3", edition, 0.5, "/body/DocFragment[3]/body/p[9]", "pb")
@@ -221,10 +213,7 @@ describe("SyncsController v2", function()
             local response = get("reader", "key", "C1", ids(original))
             assert.are.same(200, response.status)
             assert.are.same("C1", response.body.document)
-            -- Found on the reader's own content digest ...
             assert.are.same("content", response.body.match)
-            -- ... but written by a copy that shares only the metadata, so the
-            -- xpointer is not safe to follow and the client is told exactly that.
             assert.are.same("metadata", response.body.progress_match)
         end)
 
@@ -251,13 +240,10 @@ describe("SyncsController v2", function()
 
         it("answers in the reader's order of preference", function()
             update("reader", "key", "C1", original, 0.32, xpointer, "my kpw")
-            -- The same three identifiers, offered weakest first. The document
-            -- in the path is the first of them, because that is what "the one
-            -- identifier I would send if you only took one" means.
+            -- The same three, weakest first.
             local response = get("reader", "key", "M", "metadata:M,structure:S1,content:C1")
             assert.are.same("metadata", response.body.match)
             assert.are.same("metadata", response.body.progress_match)
-            -- Strongest first, and the same three identifiers answer differently.
             response = get("reader", "key", "C1", ids(original))
             assert.are.same("content", response.body.match)
             assert.are.same("content", response.body.progress_match)

@@ -1,23 +1,16 @@
---------------------------------------------------------------------------------
--- Parsing and comparison of the v2 document identifier list.
---
--- The server never interprets an identifier type. A type is an opaque label
--- chosen by the client, stored as given and echoed back, so the set of usable
--- identifiers can grow without the server learning anything about a document.
--- Everything here is pure Lua: no ngx, no redis, no side effects.
---------------------------------------------------------------------------------
+-- Parsing and comparison of the v2 identifier list. A type is an opaque label
+-- chosen by the client, stored as given and echoed back, so the set can grow
+-- without the server learning anything. Pure Lua: no ngx, no redis.
 
 local Identifiers = {}
 
--- A request may carry a handful of identifiers per document, not a catalogue.
 Identifiers.max_count = 8
 Identifiers.max_type_length = 32
 Identifiers.max_value_length = 128
 
--- Types name a scheme, values are digests. Neither may contain the separators
--- used by the alias value, the stored list or the query string, and values are
--- concatenated into redis keys so they carry the same restrictions as a
--- document field.
+-- Neither may contain the separators used by the alias value, the stored list
+-- or the query string. Values reach redis keys, so they carry the same
+-- restrictions as a document field.
 local type_pattern = "^[a-z][a-z0-9%-]*$"
 local value_pattern = "^[A-Za-z0-9][A-Za-z0-9%-_%.]*$"
 
@@ -36,8 +29,7 @@ end
 Identifiers.is_valid_type = is_valid_type
 Identifiers.is_valid_value = is_valid_value
 
--- Split on a single character separator, keeping empty fields so malformed
--- input is rejected rather than silently shortened.
+-- Keeps empty fields, so malformed input is rejected rather than shortened.
 local function split(text, separator)
     local fields = {}
     local position = 1
@@ -54,12 +46,7 @@ end
 
 Identifiers.split = split
 
---------------------------------------------------------------------------------
--- Request parsing
---------------------------------------------------------------------------------
-
--- Parse the `identifiers` field of a v2 request body: an array of
--- { type = "...", value = "..." } in the client's own order of preference.
+-- The body's `identifiers` array, in the client's order of preference.
 -- Returns the list, or nil and the reason it was rejected.
 function Identifiers.parse_list(raw)
     if raw == nil then
@@ -102,9 +89,8 @@ function Identifiers.parse_list(raw)
     return list
 end
 
--- Parse the `ids` query parameter of a v2 progress read: the same ordered list
--- flattened to "type:digest,type:digest". A GET has no body, and repeated query
--- parameters are not ordered reliably, so the order lives in one value.
+-- The same list flattened to "type:digest,type:digest". A GET has no body and
+-- repeated query parameters are not reliably ordered, so order lives in one.
 function Identifiers.parse_query(raw)
     if raw == nil then
         return nil, "absent"
