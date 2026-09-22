@@ -29,15 +29,42 @@ local Redis = {
     options = {},
 }
 
+-- How long an idle connection is held. config/redis.conf sets `timeout 0`, so
+-- the server never closes one first.
+local keepalive_timeout = 60000
+
+-- One pool per database. A reused connection is the same socket, so it is
+-- already on the database it selected, and connections that selected another
+-- are in another pool. port is formatted, not concatenated: a unix socket
+-- configuration leaves it unset.
+local function pool_name(option)
+    return string.format("%s:%s/%s", option.host, tostring(option.port), option.database)
+end
+
 function Redis:new()
     local redis = require("resty.redis")
     local option = DbSettings[Gin.env]
     local red = redis:new()
     red:set_timeout(1000) -- 1 sec
-    local ok, err = red:connect(option.host, option.port)
+    local ok, err = red:connect(option.host, option.port, {
+        pool = pool_name(option),
+        pool_size = option.pool
+    })
     if ok then
-        red:select(option.database)
+        -- Only a new socket needs it; see pool_name above.
+        if red:get_reused_times() == 0 then
+            red:select(option.database)
+        end
         return red
+    end
+end
+
+-- Returns the connection to the pool. set_keepalive refuses a socket with an
+-- unread reply or a read or write error, and close is the fallback.
+function Redis.release(red)
+    local option = DbSettings[Gin.env]
+    if not red:set_keepalive(keepalive_timeout, option.pool) then
+        red:close()
     end
 end
 
