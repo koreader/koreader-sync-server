@@ -1,13 +1,19 @@
 local Redis = require "db.redis"
+local Identifiers = require "lib.identifiers"
 
 local SyncsController = {
     user_key = "user:%s:key",
     doc_key = "user:%s:document:%s",
+    user_prefix = "user:%s:",
     progress_field = "progress",
     percentage_field = "percentage",
     device_field = "device",
     device_id_field = "device_id",
     timestamp_field = "timestamp",
+    -- The writer's identifiers, and the progress string they were recorded
+    -- against.
+    identifiers_field = "identifiers",
+    identifiers_for_field = "identifiers_for",
 
     error_no_redis = 1000,
     error_internal = 2000,
@@ -62,6 +68,80 @@ redis.call("HSET", KEYS[2], unpack(ARGV, 2))
 return 1
 ]]
 
+-- The same write for a request that names identifiers: resolve, write and
+-- register in one operation, on the same authentication check.
+--
+-- An alias is only created, never repointed, so a weak identifier can stop
+-- matching but cannot match the wrong record. A digest that is a document in
+-- its own right is never shadowed; an alias whose target is gone is replaced.
+local update_matched_script = [[
+if redis.call("GET", KEYS[1]) ~= ARGV[1] then
+    return { 0 }
+end
+local prefix = ARGV[2]
+local first = 4
+local last = first + tonumber(ARGV[3]) * 2 - 1
+local canonical, matched
+for i = first, last, 2 do
+    local id_type, digest = ARGV[i], ARGV[i + 1]
+    if redis.call("EXISTS", prefix .. "document:" .. digest) == 1 then
+        canonical, matched = digest, id_type
+        break
+    end
+    local alias = redis.call("GET", prefix .. "alias:" .. digest)
+    local target = alias and string.match(alias, "^[^:]*:(.+)$")
+    if target and redis.call("EXISTS", prefix .. "document:" .. target) == 1 then
+        canonical, matched = target, id_type
+        break
+    end
+end
+if not canonical then
+    canonical, matched = ARGV[first + 1], ARGV[first]
+end
+redis.call("HSET", prefix .. "document:" .. canonical, unpack(ARGV, last + 1))
+for i = first, last, 2 do
+    local digest = ARGV[i + 1]
+    if digest ~= canonical and redis.call("EXISTS", prefix .. "document:" .. digest) == 0 then
+        local alias_key = prefix .. "alias:" .. digest
+        local existing = redis.call("GET", alias_key)
+        local target = existing and string.match(existing, "^[^:]*:(.+)$")
+        if not (target and redis.call("EXISTS", prefix .. "document:" .. target) == 1) then
+            redis.call("SET", alias_key, ARGV[i] .. ":" .. canonical)
+        end
+    end
+end
+return { 1, matched, canonical }
+]]
+
+-- Walk the identifiers in the caller's order, trying each as a document before
+-- following it through the alias table, and read the record found. A redis
+-- reply stops at the first nil and HMGET answers a missing field with false, so
+-- presence travels as a string of flags beside the values.
+local resolve_document_script = [[
+local prefix = ARGV[1]
+local function read(digest, id_type)
+    local fields = redis.call("HMGET", prefix .. "document:" .. digest, unpack(KEYS))
+    local out = { id_type, digest, "" }
+    for i = 1, #KEYS do
+        out[3] = out[3] .. (fields[i] and "1" or "0")
+        out[3 + i] = fields[i] or ""
+    end
+    return out
+end
+for i = 2, #ARGV, 2 do
+    local id_type, digest = ARGV[i], ARGV[i + 1]
+    if redis.call("EXISTS", prefix .. "document:" .. digest) == 1 then
+        return read(digest, id_type)
+    end
+    local alias = redis.call("GET", prefix .. "alias:" .. digest)
+    local target = alias and string.match(alias, "^[^:]*:(.+)$")
+    if target and redis.call("EXISTS", prefix .. "document:" .. target) == 1 then
+        return read(target, id_type)
+    end
+end
+return {}
+]]
+
 -- Authenticate and update in one operation so concurrent changes using the
 -- same current key cannot both succeed. Document keys are never touched.
 local update_password_script = [[
@@ -88,6 +168,23 @@ end
 -- the way in rather than accepting a write that can never be read back.
 local function is_servable_document(field)
     return string.match(field, "^[A-Za-z0-9_]+$") ~= nil
+end
+
+-- The identifiers a request offered, or nil when it named none. The first must
+-- be the document, so `document` keeps meaning "the identifier I would send if
+-- you only took one".
+local function read_identifiers(raw, document, parse)
+    if raw == nil then
+        return nil
+    end
+    local list, reason = parse(raw)
+    if not list then
+        return nil, reason
+    end
+    if list[1].value ~= document then
+        return nil, "first identifier is not the document"
+    end
+    return list
 end
 
 -- gin builds a controller per request, so the handle lives exactly as long as
@@ -192,6 +289,79 @@ function SyncsController:update_password()
     return 200, { updated = true }
 end
 
+-- A read that named identifiers. The record is resolved through them, and the
+-- response says both how it was found and what the reader has in common with
+-- the client that wrote the progress string.
+local function read_matched(self, redis, username, identifiers)
+    local fields = {
+        self.percentage_field,
+        self.progress_field,
+        self.device_field,
+        self.device_id_field,
+        self.timestamp_field,
+        self.identifiers_field,
+        self.identifiers_for_field,
+    }
+    local call = { resolve_document_script, #fields }
+    for _, field in ipairs(fields) do
+        table.insert(call, field)
+    end
+    table.insert(call, string.format(self.user_prefix, username))
+    for _, argument in ipairs(Identifiers.to_arguments(identifiers)) do
+        table.insert(call, argument)
+    end
+
+    local resolved, err = redis:eval(unpack(call))
+    if err then
+        self:raise_error(self.error_internal)
+    end
+    if type(resolved) ~= "table" or resolved[2] == nil or resolved[2] == null then
+        return {}
+    end
+
+    local present = resolved[3]
+    local values = {}
+    for index = 1, #fields do
+        if string.sub(present, index, index) == "1" then
+            values[index] = resolved[3 + index]
+        end
+    end
+
+    local res = {}
+    if values[1] then
+        res.percentage = tonumber(values[1])
+    end
+    if values[2] then
+        res.progress = values[2]
+    end
+    if values[3] then
+        res.device = values[3]
+    end
+    if values[4] then
+        res.device_id = values[4]
+    end
+    if values[5] then
+        res.timestamp = tonumber(values[5])
+    end
+    if not next(res) then
+        return res
+    end
+
+    -- The digest the record is stored under, not necessarily the one asked for.
+    res.document = resolved[2]
+    res.match = resolved[1]
+
+    -- How the record was found and who wrote the progress are different
+    -- questions, so the writer's identifiers are compared separately.
+    local writer = values[7] == res.progress and Identifiers.decode_list(values[6]) or nil
+    if writer then
+        res.progress_match = Identifiers.common(identifiers, writer) or "none"
+    else
+        res.progress_match = res.match
+    end
+    return res
+end
+
 function SyncsController:get_progress()
     local redis = self:getRedis()
 
@@ -203,6 +373,15 @@ function SyncsController:get_progress()
     local doc = self.params.document
     if not is_valid_key_field(doc) then
         self:raise_error(self.error_document_field_missing)
+    end
+
+    local identifiers, reason = read_identifiers(self.request.uri_params.ids, doc,
+        Identifiers.parse_query)
+    if reason then
+        self:raise_error(self.error_invalid_fields)
+    end
+    if identifiers then
+        return 200, read_matched(self, redis, username, identifiers)
     end
 
     local key = string.format(self.doc_key, username, doc)
@@ -241,6 +420,41 @@ function SyncsController:get_progress()
     return 200, res
 end
 
+-- A write that named identifiers. Returns the type that found the record and
+-- the digest it is stored under.
+local function write_matched(self, redis, username, identifiers, progress, fields)
+    -- Recorded beside the progress they were written with, so identifiers are
+    -- never attributed to a string their owner did not write.
+    table.insert(fields, self.identifiers_field)
+    table.insert(fields, Identifiers.encode_list(identifiers))
+    table.insert(fields, self.identifiers_for_field)
+    table.insert(fields, progress)
+
+    local arguments = {
+        self.request.headers['x-auth-key'],
+        string.format(self.user_prefix, username),
+        #identifiers,
+    }
+    for _, argument in ipairs(Identifiers.to_arguments(identifiers)) do
+        table.insert(arguments, argument)
+    end
+    for _, field in ipairs(fields) do
+        table.insert(arguments, field)
+    end
+
+    local updated, err = redis:eval(update_matched_script, 1,
+        string.format(self.user_key, username), unpack(arguments))
+    if type(updated) ~= "table" then
+        self:raise_error(self.error_internal)
+    elseif updated[1] == 0 then
+        self:raise_error(self.error_unauthorized_user)
+    elseif updated[1] ~= 1 then
+        self:raise_error(self.error_internal)
+    end
+
+    return updated[2], updated[3]
+end
+
 function SyncsController:update_progress()
     local redis = self:getRedis()
 
@@ -257,15 +471,19 @@ function SyncsController:update_progress()
         self:raise_error(self.error_document_not_servable)
     end
 
+    local identifiers, reason = read_identifiers(self.request.body.identifiers, doc,
+        Identifiers.parse_list)
+    if reason then
+        self:raise_error(self.error_invalid_fields)
+    end
+
     local percentage = tonumber(self.request.body.percentage)
     local progress = self.request.body.progress
     local device = self.request.body.device
     local device_id = self.request.body.device_id
     local timestamp = os.time()
     if percentage and progress and device then
-        local key = string.format(self.doc_key, username, doc)
         local fields = {
-            self.request.headers['x-auth-key'],
             self.percentage_field, percentage,
             self.progress_field, progress,
             self.device_field, device,
@@ -275,8 +493,21 @@ function SyncsController:update_progress()
             table.insert(fields, self.device_id_field)
             table.insert(fields, device_id)
         end
+
+        if identifiers then
+            local match, canonical = write_matched(self, redis, username, identifiers,
+                progress, fields)
+            return 200, {
+                document = canonical,
+                match = match,
+                timestamp = timestamp,
+            }
+        end
+
+        local key = string.format(self.doc_key, username, doc)
         local updated, err = redis:eval(update_progress_script, 2,
-            string.format(self.user_key, username), key, unpack(fields))
+            string.format(self.user_key, username), key,
+            self.request.headers['x-auth-key'], unpack(fields))
         if updated == 0 then
             self:raise_error(self.error_unauthorized_user)
         elseif updated ~= 1 then
