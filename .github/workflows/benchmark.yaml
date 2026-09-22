@@ -1,0 +1,40 @@
+# Advisory only: manual dispatch, reports into the job summary, gates nothing.
+name: Benchmark
+
+on:
+  workflow_dispatch:
+    inputs:
+      base:
+        description: Ref to compare against
+        default: origin/master
+      head:
+        description: Ref to measure, empty for the dispatched ref
+        default: ''
+      reps:
+        description: Repetitions per arm
+        default: '3'
+      duration:
+        description: Seconds per measurement
+        default: '10'
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Run benchmark
+        run: |
+          ./scripts/benchmark.sh \
+            --base '${{ inputs.base }}' \
+            --head '${{ inputs.head || github.sha }}' \
+            --reps '${{ inputs.reps }}' \
+            --duration '${{ inputs.duration }}'
