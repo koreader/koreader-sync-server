@@ -90,11 +90,17 @@ local function is_servable_document(field)
     return string.match(field, "^[A-Za-z0-9_]+$") ~= nil
 end
 
+-- gin builds a controller per request, so the handle lives exactly as long as
+-- the request does.
 function SyncsController:getRedis()
+    if self.redis then
+        return self.redis
+    end
     local redis = Redis:new()
     if not redis then
         self:raise_error(self.error_no_redis)
     else
+        self.redis = redis
         return redis
     end
 end
