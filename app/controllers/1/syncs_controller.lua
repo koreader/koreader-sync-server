@@ -295,4 +295,36 @@ function SyncsController:healthcheck()
     return 200, { state = 'OK' }
 end
 
+-- gin dispatches straight to the action and turns raise_error into a response
+-- with pcall, so an action has no return point every path passes through. The
+-- connection goes back to the pool here, inside the content phase: nginx
+-- finalizes cosockets before log_by_lua runs, where set_keepalive fails with
+-- "closed".
+local function releasing(action)
+    return function(self, ...)
+        local ok, status, body, headers = pcall(action, self, ...)
+        if self.redis then
+            Redis.release(self.redis)
+            self.redis = nil
+        end
+        if not ok then
+            error(status, 0)
+        end
+        return status, body, headers
+    end
+end
+
+for _, action in ipairs({
+    "auth_user",
+    "create_user",
+    "create_user_disabled",
+    "delete_user",
+    "update_password",
+    "get_progress",
+    "update_progress",
+    "healthcheck"
+}) do
+    SyncsController[action] = releasing(SyncsController[action])
+end
+
 return SyncsController
