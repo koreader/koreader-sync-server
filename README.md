@@ -113,7 +113,8 @@ or recompressed copy can find the reading position stored for another copy. A
 request that names none behaves exactly as it did before.
 
 Identifiers are `{ "type", "value" }` pairs in the client's order of preference,
-and the first must equal `document`. A type is an opaque label: the server stores
+one of which must equal `document`, so a record stays addressable by the digest a
+client that names none would send. A type is an opaque label: the server stores
 and echoes it without interpreting it, so new identifiers need no server change.
 
 ```bash

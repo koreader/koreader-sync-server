@@ -79,7 +79,8 @@ if redis.call("GET", KEYS[1]) ~= ARGV[1] then
     return { 0 }
 end
 local prefix = ARGV[2]
-local first = 4
+local document = ARGV[4]
+local first = 5
 local last = first + tonumber(ARGV[3]) * 2 - 1
 local canonical, matched
 for i = first, last, 2 do
@@ -96,7 +97,17 @@ for i = first, last, 2 do
     end
 end
 if not canonical then
-    canonical, matched = ARGV[first + 1], ARGV[first]
+    -- Nothing resolved, so the record is created under `document`, which the
+    -- list is required to contain. Position in the list carries preference, not
+    -- identity: a client's strongest identifier need not be the one it is
+    -- addressed by.
+    canonical = document
+    for i = first, last, 2 do
+        if ARGV[i + 1] == document then
+            matched = ARGV[i]
+            break
+        end
+    end
 end
 redis.call("HSET", prefix .. "document:" .. canonical, unpack(ARGV, last + 1))
 for i = first, last, 2 do
@@ -170,9 +181,11 @@ local function is_servable_document(field)
     return string.match(field, "^[A-Za-z0-9_]+$") ~= nil
 end
 
--- The identifiers a request offered, or nil when it named none. The first must
--- be the document, so `document` keeps meaning "the identifier I would send if
--- you only took one".
+-- The identifiers a request offered, or nil when it named none. One of them has
+-- to be the document, so a record stays addressable by the digest a client that
+-- names none would send. Which one does not matter: the list is ordered by
+-- preference, and a client whose document digest is its weakest identifier would
+-- otherwise have to offer that one first and be matched on it.
 local function read_identifiers(raw, document, parse)
     if raw == nil then
         return nil
@@ -181,10 +194,12 @@ local function read_identifiers(raw, document, parse)
     if not list then
         return nil, reason
     end
-    if list[1].value ~= document then
-        return nil, "first identifier is not the document"
+    for _, identifier in ipairs(list) do
+        if identifier.value == document then
+            return list
+        end
     end
-    return list
+    return nil, "no identifier is the document"
 end
 
 -- gin builds a controller per request, so the handle lives exactly as long as
@@ -422,7 +437,7 @@ end
 
 -- A write that named identifiers. Returns the type that found the record and
 -- the digest it is stored under.
-local function write_matched(self, redis, username, identifiers, progress, fields)
+local function write_matched(self, redis, username, document, identifiers, progress, fields)
     -- Recorded beside the progress they were written with, so identifiers are
     -- never attributed to a string their owner did not write.
     table.insert(fields, self.identifiers_field)
@@ -434,6 +449,7 @@ local function write_matched(self, redis, username, identifiers, progress, field
         self.request.headers['x-auth-key'],
         string.format(self.user_prefix, username),
         #identifiers,
+        document,
     }
     for _, argument in ipairs(Identifiers.to_arguments(identifiers)) do
         table.insert(arguments, argument)
@@ -495,7 +511,7 @@ function SyncsController:update_progress()
         end
 
         if identifiers then
-            local match, canonical = write_matched(self, redis, username, identifiers,
+            local match, canonical = write_matched(self, redis, username, doc, identifiers,
                 progress, fields)
             return 200, {
                 document = canonical,

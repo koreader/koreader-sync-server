@@ -300,6 +300,39 @@ describe("SyncsController identifiers", function()
         end)
     end)
 
+    describe("#the document need not be first", function()
+        before_each(function()
+            register("reader", "key")
+        end)
+
+        -- A client whose document digest is its weakest identifier, which is what
+        -- a filename-matching reader sends.
+        local weakest_first = {
+            { type = "content", value = "C1" },
+            { type = "structure", value = "S1" },
+            { type = "filename", value = "F1" },
+        }
+
+        it("creates the record under the document, not under the first identifier", function()
+            local response = update("reader", "key", "F1", weakest_first, 0.32, xpointer, "d")
+            assert.are.same(200, response.status)
+            assert.are.same("F1", response.body.document)
+            assert.are.same("filename", response.body.match)
+
+            -- The point of requiring the document at all: a client that names no
+            -- identifiers still finds the record, and no alias is followed to do it.
+            local plain = get("reader", "key", "F1")
+            assert.are.same(0.32, plain.body.percentage)
+        end)
+
+        it("matches on the strongest identifier the caller offered", function()
+            update("reader", "key", "F1", weakest_first, 0.32, xpointer, "d")
+            local response = get("reader", "key", "F1", ids(weakest_first))
+            assert.are.same("content", response.body.match)
+            assert.are.same("content", response.body.progress_match)
+        end)
+    end)
+
     describe("#validation", function()
         before_each(function()
             register("reader", "key")
@@ -310,7 +343,7 @@ describe("SyncsController identifiers", function()
             assert.are.same({ code = 2003, message = "Invalid request" }, response.body)
         end
 
-        it("refuses an identifier list that does not begin with the document", function()
+        it("refuses an identifier list that does not name the document", function()
             assert_invalid(update("reader", "key", "C1", repack, 0.32, xpointer, "d"))
             assert_invalid(get("reader", "key", "C1", "metadata:M"))
         end)
