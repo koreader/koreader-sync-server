@@ -138,7 +138,10 @@ acts on neither.
 Identifiers other than the record's own become aliases, per account, removed
 with the account. An alias is only created, never repointed, and never shadows
 an existing document, so a weak identifier can fail to match but cannot move a
-position onto the wrong record. At most 8 per request.
+position onto the wrong record. An identifier ranked above the one that matched
+is not registered at all: matching on a weak identifier is a guess, and gluing
+the caller's strongest digests to a guess would make a wrong one permanent. At
+most 8 per request.
 
 Privacy and security
 ========

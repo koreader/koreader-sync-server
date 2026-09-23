@@ -74,6 +74,12 @@ return 1
 -- An alias is only created, never repointed, so a weak identifier can stop
 -- matching but cannot match the wrong record. A digest that is a document in
 -- its own right is never shadowed; an alias whose target is gone is replaced.
+--
+-- An identifier the caller ranks ABOVE the one that matched is never registered.
+-- A match on a weak identifier is a guess, and gluing the caller's strongest
+-- digests to a guess makes a wrong one permanent: correcting whatever caused it
+-- would not free the copy again. Registering only what the caller ranks at or
+-- below the match keeps a wrong guess confined to the identifier that made it.
 local update_matched_script = [[
 if redis.call("GET", KEYS[1]) ~= ARGV[1] then
     return { 0 }
@@ -82,17 +88,17 @@ local prefix = ARGV[2]
 local document = ARGV[4]
 local first = 5
 local last = first + tonumber(ARGV[3]) * 2 - 1
-local canonical, matched
+local canonical, matched, matched_at
 for i = first, last, 2 do
     local id_type, digest = ARGV[i], ARGV[i + 1]
     if redis.call("EXISTS", prefix .. "document:" .. digest) == 1 then
-        canonical, matched = digest, id_type
+        canonical, matched, matched_at = digest, id_type, i
         break
     end
     local alias = redis.call("GET", prefix .. "alias:" .. digest)
     local target = alias and string.match(alias, "^[^:]*:(.+)$")
     if target and redis.call("EXISTS", prefix .. "document:" .. target) == 1 then
-        canonical, matched = target, id_type
+        canonical, matched, matched_at = target, id_type, i
         break
     end
 end
@@ -108,9 +114,11 @@ if not canonical then
             break
         end
     end
+    -- The record is the caller's own, so every identifier it offers describes it.
+    matched_at = first
 end
 redis.call("HSET", prefix .. "document:" .. canonical, unpack(ARGV, last + 1))
-for i = first, last, 2 do
+for i = matched_at, last, 2 do
     local digest = ARGV[i + 1]
     if digest ~= canonical and redis.call("EXISTS", prefix .. "document:" .. digest) == 0 then
         local alias_key = prefix .. "alias:" .. digest

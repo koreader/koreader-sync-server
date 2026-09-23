@@ -300,6 +300,47 @@ describe("SyncsController identifiers", function()
         end)
     end)
 
+    describe("#a weak match does not glue the strong identifiers", function()
+        before_each(function()
+            register("reader", "key")
+        end)
+
+        -- Two different books a library tagged alike, so they share only the
+        -- weakest identifier. The second has never been pushed.
+        local shared = "M-shared"
+        local one = {
+            { type = "content", value = "B1" },
+            { type = "structure", value = "B1S" },
+            { type = "metadata", value = shared },
+        }
+        local two = {
+            { type = "content", value = "B2" },
+            { type = "structure", value = "B2S" },
+            { type = "metadata", value = shared },
+        }
+
+        it("leaves the caller's own digests free after a wrong match", function()
+            update("reader", "key", "B1", one, 0.8, xpointer, "d")
+            local merged = update("reader", "key", "B2", two, 0.01, "/body/p[1]", "d")
+            assert.are.same("metadata", merged.body.match)
+            assert.are.same("B1", merged.body.document)
+
+            -- The tagging is corrected, so the books no longer share anything.
+            local corrected = {
+                { type = "content", value = "B2" },
+                { type = "structure", value = "B2S" },
+                { type = "metadata", value = "M-two" },
+            }
+            local response = update("reader", "key", "B2", corrected, 0.05, "/body/p[4]", "d")
+            assert.are.same("B2", response.body.document)
+            assert.are.same("content", response.body.match)
+
+            -- and the second book is its own record again
+            local read = get("reader", "key", "B2", ids(corrected))
+            assert.are.same(0.05, read.body.percentage)
+        end)
+    end)
+
     describe("#the document need not be first", function()
         before_each(function()
             register("reader", "key")
