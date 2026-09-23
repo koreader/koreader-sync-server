@@ -104,6 +104,45 @@ Incorrect credentials and stale retries return HTTP 401. If a response is lost,
 confirm the replacement key with `GET /users/auth`. Invalid replacement values
 return HTTP 403 (code 2003).
 
+Matching a document across copies
+========
+
+`PUT /syncs/progress` optionally takes an `identifiers` array and
+`GET /syncs/progress/:document` an optional `ids` query parameter, so a renamed
+or recompressed copy can find the reading position stored for another copy. A
+request that names none behaves exactly as it did before.
+
+Identifiers are `{ "type", "value" }` pairs in the client's order of preference,
+one of which must equal `document`, so a record stays addressable by the digest a
+client that names none would send. A type is an opaque label: the server stores
+and echoes it without interpreting it, so new identifiers need no server change.
+
+```bash
+# write
+curl -X PUT .../syncs/progress \
+    -d '{"document":"<content>",
+         "identifiers":[{"type":"content","value":"<content>"},
+                        {"type":"structure","value":"<structure>"}],
+         "percentage":0.42,"progress":"<xpointer>","device":"my kpw"}'
+
+# read: a GET has no body, so the list is one ordered parameter
+curl ".../syncs/progress/<content>?ids=content:<d>,structure:<d>"
+```
+
+Such a request gets two more fields back, and only such a request. `match` is
+the identifier type that resolved the lookup. `progress_match` is the strongest
+identifier shared with whoever wrote the current `progress` string, and is the
+one that says whether an xpointer can be followed. The server reports both and
+acts on neither.
+
+Identifiers other than the record's own become aliases, per account, removed
+with the account. An alias is only created, never repointed, and never shadows
+an existing document, so a weak identifier can fail to match but cannot move a
+position onto the wrong record. An identifier ranked above the one that matched
+is not registered at all: matching on a weak identifier is a guess, and gluing
+the caller's strongest digests to a guess would make a wrong one permanent. At
+most 8 per request.
+
 Privacy and security
 ========
 
