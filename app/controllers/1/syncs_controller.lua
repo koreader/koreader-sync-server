@@ -80,13 +80,17 @@ return 1
 -- digests to a guess makes a wrong one permanent: correcting whatever caused it
 -- would not free the copy again. Registering only what the caller ranks at or
 -- below the match keeps a wrong guess confined to the identifier that made it.
+--
+-- A match through an entry the caller marked weak does not claim the record: the
+-- write lands on the caller's own document, as though nothing had matched.
 local update_matched_script = [[
 if redis.call("GET", KEYS[1]) ~= ARGV[1] then
     return { 0 }
 end
 local prefix = ARGV[2]
 local document = ARGV[4]
-local first = 5
+local weak = ARGV[5]
+local first = 6
 local last = first + tonumber(ARGV[3]) * 2 - 1
 local canonical, matched, matched_at
 for i = first, last, 2 do
@@ -102,11 +106,17 @@ for i = first, last, 2 do
         break
     end
 end
+if canonical then
+    local position = (matched_at - first) / 2 + 1
+    if string.sub(weak, position, position) == "1" then
+        canonical = nil
+    end
+end
 if not canonical then
-    -- Nothing resolved, so the record is created under `document`, which the
-    -- list is required to contain. Position in the list carries preference, not
-    -- identity: a client's strongest identifier need not be the one it is
-    -- addressed by.
+    -- Nothing resolved, or only a weak entry did, so the record is created under
+    -- `document`, which the list is required to contain. Position in the list
+    -- carries preference, not identity: a client's strongest identifier need not
+    -- be the one it is addressed by.
     canonical = document
     for i = first, last, 2 do
         if ARGV[i + 1] == document then
@@ -458,6 +468,7 @@ local function write_matched(self, redis, username, document, identifiers, progr
         string.format(self.user_prefix, username),
         #identifiers,
         document,
+        Identifiers.weak_flags(identifiers),
     }
     for _, argument in ipairs(Identifiers.to_arguments(identifiers)) do
         table.insert(arguments, argument)

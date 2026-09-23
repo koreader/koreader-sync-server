@@ -341,6 +341,76 @@ describe("SyncsController identifiers", function()
         end)
     end)
 
+    describe("#weak identifiers", function()
+        before_each(function()
+            register("reader", "key")
+        end)
+
+        -- Two different books a library tagged alike, so the tag is all they
+        -- share and the client marks it weak.
+        local shared = "M-shared"
+        local one = {
+            { type = "content", value = "B1" },
+            { type = "structure", value = "B1S" },
+            { type = "metadata", value = shared, weak = true },
+        }
+        local two = {
+            { type = "content", value = "B2" },
+            { type = "structure", value = "B2S" },
+            { type = "metadata", value = shared, weak = true },
+        }
+
+        it("takes the flag, and a strong match still adopts the record", function()
+            local response = update("reader", "key", "B1", one, 0.8, xpointer, "d")
+            assert.are.same(200, response.status)
+            assert.are.same("B1", response.body.document)
+            assert.are.same("content", response.body.match)
+
+            -- The same book recompressed: the spine still matches.
+            local repacked = {
+                { type = "content", value = "B1B" },
+                { type = "structure", value = "B1S" },
+                { type = "metadata", value = shared, weak = true },
+            }
+            response = update("reader", "key", "B1B", repacked, 0.9, "/body/p[9]", "d")
+            assert.are.same("B1", response.body.document)
+            assert.are.same("structure", response.body.match)
+        end)
+
+        it("keeps two works apart and leaves the first one's position alone", function()
+            update("reader", "key", "B1", one, 0.8, xpointer, "d")
+            local response = update("reader", "key", "B2", two, 0.01, "/body/p[1]", "d")
+            assert.are.same("B2", response.body.document)
+            assert.are.same("content", response.body.match)
+
+            local first = get("reader", "key", "B1", ids(one))
+            assert.are.same(xpointer, first.body.progress)
+            assert.are.same(0.8, first.body.percentage)
+
+            local second = get("reader", "key", "B2", ids(two))
+            assert.are.same("B2", second.body.document)
+            assert.are.same(0.01, second.body.percentage)
+        end)
+
+        it("resolves a read, so the copy is seeded by what it did not claim", function()
+            update("reader", "key", "B1", one, 0.8, xpointer, "d")
+            local response = get("reader", "key", "B2", ids(two))
+            assert.are.same("B1", response.body.document)
+            assert.are.same("metadata", response.body.match)
+            assert.are.same(xpointer, response.body.progress)
+        end)
+
+        it("registers the caller's own digests against the record it creates", function()
+            update("reader", "key", "B1", one, 0.8, xpointer, "d")
+            update("reader", "key", "B2", two, 0.01, "/body/p[1]", "d")
+
+            local redis = redis_client()
+            assert.are.same("structure:B2", redis:get("user:reader:alias:B2S"))
+            assert.are.same("metadata:B1", redis:get("user:reader:alias:" .. shared))
+            redis:quit()
+        end)
+    end)
+
     describe("#the document need not be first", function()
         before_each(function()
             register("reader", "key")

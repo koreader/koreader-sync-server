@@ -44,6 +44,19 @@ describe("Identifiers", function()
             }))
         end)
 
+        it("keeps the weak flag, and rejects one that is not a boolean", function()
+            assert.are.same({
+                { type = "content", value = "aaa" },
+                { type = "metadata", value = "bbb", weak = true },
+            }, Identifiers.parse_list({
+                { type = "content", value = "aaa", weak = false },
+                { type = "metadata", value = "bbb", weak = true },
+            }))
+            assert.is_nil(Identifiers.parse_list({
+                { type = "metadata", value = "bbb", weak = "yes" },
+            }))
+        end)
+
         it("rejects a value longer than a digest", function()
             local long = string.rep("a", Identifiers.max_value_length + 1)
             assert.is_nil(Identifiers.parse_list({ { type = "content", value = long } }))
@@ -68,6 +81,16 @@ describe("Identifiers", function()
             assert.is_nil(Identifiers.parse_query("content:aaa:bbb"))
             assert.is_nil(Identifiers.parse_query("content:aaa,content:bbb"))
             assert.is_nil(Identifiers.parse_query(true))
+        end)
+    end)
+
+    describe("#weak_flags", function()
+        it("reports one flag per identifier, in list order", function()
+            assert.are.same("010", Identifiers.weak_flags({
+                { type = "content", value = "aaa" },
+                { type = "metadata", value = "bbb", weak = true },
+                { type = "filename", value = "ccc" },
+            }))
         end)
     end)
 

@@ -46,7 +46,9 @@ end
 
 Identifiers.split = split
 
--- The body's `identifiers` array, in the client's order of preference.
+-- The body's `identifiers` array, in the client's order of preference. An entry
+-- may carry `weak`, meaning the client does not consider it enough to claim a
+-- record that already exists.
 -- Returns the list, or nil and the reason it was rejected.
 function Identifiers.parse_list(raw)
     if raw == nil then
@@ -82,8 +84,11 @@ function Identifiers.parse_list(raw)
         if seen[entry.type] then
             return nil, "duplicate type"
         end
+        if entry.weak ~= nil and type(entry.weak) ~= "boolean" then
+            return nil, "invalid weak"
+        end
         seen[entry.type] = true
-        table.insert(list, { type = entry.type, value = entry.value })
+        table.insert(list, { type = entry.type, value = entry.value, weak = entry.weak or nil })
     end
 
     return list
@@ -192,6 +197,16 @@ function Identifiers.common(reader, writer)
         end
     end
     return nil
+end
+
+-- Which entries are weak, one flag each, in list order. Weakness bears on
+-- adoption, which is a property of a write, so only the write path reads it.
+function Identifiers.weak_flags(list)
+    local flags = {}
+    for _, identifier in ipairs(list) do
+        table.insert(flags, identifier.weak and "1" or "0")
+    end
+    return table.concat(flags)
 end
 
 -- Flatten a list to the argument pairs a redis script consumes.
